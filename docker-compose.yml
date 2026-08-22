@@ -1,0 +1,12 @@
+name: kalkisenadrive-dashboard
+
+services:
+  web:
+    build:
+      context: .
+      args:
+        VITE_API_URL: ${VITE_API_URL:-http://localhost:3011/api/v1}
+    container_name: kalkisena-dashboard
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:${DASHBOARD_PORT:-3015}:80"
