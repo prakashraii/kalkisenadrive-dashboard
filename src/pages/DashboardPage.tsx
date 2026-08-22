@@ -1,6 +1,4 @@
-import { useState } from 'react'
 import { useQuery } from '@tanstack/react-query'
-import { useNavigate } from 'react-router-dom'
 import {
   Bar,
   BarChart,
@@ -26,14 +24,10 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
-import { api, type Paginated, type PaymentRow } from '../lib/api'
-import { formatMoney } from '../lib/cn'
+import { SnapshotList } from '../components/dashboard/SnapshotList'
 import { StatCard } from '../components/ui/StatCard'
-import { TableToolbar } from '../components/ui/TableToolbar'
-import { Pagination } from '../components/ui/Pagination'
-import { PaymentTable } from '../components/ui/PaymentTable'
-import { Modal } from '../components/ui/Actions'
-import { DetailList } from '../components/ui/DetailList'
+import { api, type Paginated, type PaymentRow } from '../lib/api'
+import { countryName, formatDate, formatMoney } from '../lib/cn'
 
 const COLORS = ['#60a5fa', '#f9a8d4', '#a78bfa']
 
@@ -56,27 +50,48 @@ type Summary = {
   membershipAnalytics: { name: string; count: number }[]
 }
 
-export function DashboardPage() {
-  const navigate = useNavigate()
-  const [donPage, setDonPage] = useState(1)
-  const [memPage, setMemPage] = useState(1)
-  const [donSearch, setDonSearch] = useState('')
-  const [memSearch, setMemSearch] = useState('')
-  const [view, setView] = useState<PaymentRow | null>(null)
+type ClinicRow = {
+  id: string
+  name: string
+  city: string
+  countryCode: string
+  status: string
+  memberCount?: number
+}
 
+type DriverRow = {
+  id: string
+  name: string
+  city?: string | null
+  status: string
+  vehicleType?: string | null
+  vehicleNumber?: string | null
+}
+
+const listParams = { page: 1, limit: 5 }
+
+export function DashboardPage() {
   const { data } = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: async () => (await api.get<Summary>('/admin/dashboard/summary')).data,
   })
   const donated = useQuery({
-    queryKey: ['dashboard-donated', donPage, donSearch],
+    queryKey: ['dashboard-donated'],
     queryFn: async () =>
-      (await api.get<Paginated<PaymentRow>>('/admin/dashboard/donated-users', { params: { page: donPage, limit: 10, search: donSearch || undefined } })).data,
+      (await api.get<Paginated<PaymentRow>>('/admin/dashboard/donated-users', { params: listParams })).data,
   })
   const members = useQuery({
-    queryKey: ['dashboard-members', memPage, memSearch],
+    queryKey: ['dashboard-members'],
     queryFn: async () =>
-      (await api.get<Paginated<PaymentRow>>('/admin/dashboard/members', { params: { page: memPage, limit: 10, search: memSearch || undefined } })).data,
+      (await api.get<Paginated<PaymentRow>>('/admin/memberships', { params: listParams })).data,
+  })
+  const clinics = useQuery({
+    queryKey: ['dashboard-clinics'],
+    queryFn: async () => (await api.get<Paginated<ClinicRow>>('/admin/clinics', { params: listParams })).data,
+  })
+  const drivers = useQuery({
+    queryKey: ['dashboard-drivers'],
+    queryFn: async () => (await api.get<Paginated<DriverRow>>('/admin/drivers', { params: listParams })).data,
   })
 
   const k = data?.kpis
@@ -172,48 +187,81 @@ export function DashboardPage() {
         </div>
       </div>
 
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <div className="mb-2 flex items-center justify-between">
-          <h2 className="font-semibold">Donated User List</h2>
-        </div>
-        <TableToolbar search={donSearch} onSearch={setDonSearch} onViewAll={() => navigate('/donations')} />
-        <PaymentTable rows={donated.data?.data ?? []} onView={setView} />
-        <Pagination
-          page={donated.data?.meta.page ?? 1}
-          pageCount={donated.data?.meta.pageCount ?? 1}
-          total={donated.data?.meta.total ?? 0}
-          limit={donated.data?.meta.limit ?? 10}
-          onPage={setDonPage}
+      <div className="grid gap-4 lg:grid-cols-2">
+        <SnapshotList
+          title="Donated Users"
+          icon={<HeartHandshake className="size-5" />}
+          tone="violet"
+          total={donated.data?.meta.total}
+          viewAllTo="/donations"
+          emptyText="No recent donations yet."
+          loading={donated.isLoading}
+          items={(donated.data?.data ?? []).map((row) => ({
+            id: row.donationId ?? row.id,
+            name: row.userName,
+            chip: row.type,
+            secondary: formatDate(row.date),
+            highlight: formatMoney(row.amountCents),
+            status: row.status,
+            href: row.donationId ? `/donations?view=${row.donationId}` : '/donations',
+          }))}
         />
-      </section>
-
-      <section className="rounded-2xl bg-white p-4 shadow-sm">
-        <h2 className="mb-2 font-semibold">Member List</h2>
-        <TableToolbar search={memSearch} onSearch={setMemSearch} onViewAll={() => navigate('/memberships')} />
-        <PaymentTable rows={members.data?.data ?? []} onView={setView} />
-        <Pagination
-          page={members.data?.meta.page ?? 1}
-          pageCount={members.data?.meta.pageCount ?? 1}
-          total={members.data?.meta.total ?? 0}
-          limit={members.data?.meta.limit ?? 10}
-          onPage={setMemPage}
+        <SnapshotList
+          title="Members"
+          icon={<Users className="size-5" />}
+          tone="blue"
+          total={members.data?.meta.total}
+          viewAllTo="/memberships"
+          emptyText="No members yet."
+          loading={members.isLoading}
+          items={(members.data?.data ?? []).map((row) => ({
+            id: row.id,
+            name: row.userName,
+            secondary: [row.memberId, row.plan].filter(Boolean).join(' · '),
+            highlight: row.expiresAt ? `Exp ${formatDate(row.expiresAt)}` : undefined,
+            status: row.membershipStatus ?? row.status,
+            href: `/memberships?view=${row.id}`,
+          }))}
         />
-      </section>
-
-      <Modal title="Details" open={!!view} onClose={() => setView(null)}>
-        {view && (
-          <DetailList
-            items={[
-              { label: 'User', value: view.userName },
-              { label: 'Member ID', value: view.memberId },
-              { label: 'Amount', value: formatMoney(view.amountCents) },
-              { label: 'Trans. ID', value: view.transId },
-              { label: 'Status', value: view.status },
-              { label: 'Type', value: view.type ?? view.plan ?? '—' },
-            ]}
-          />
-        )}
-      </Modal>
+        <SnapshotList
+          title="Clinics"
+          icon={<Building2 className="size-5" />}
+          tone="orange"
+          total={clinics.data?.meta.total ?? k?.totalClinics}
+          viewAllTo="/clinics"
+          emptyText="No clinics yet."
+          loading={clinics.isLoading}
+          items={(clinics.data?.data ?? []).map((row) => ({
+            id: row.id,
+            name: row.name,
+            secondary: [row.city, countryName(row.countryCode)].filter(Boolean).join(', '),
+            highlight: `${row.memberCount ?? 0} members`,
+            status: row.status,
+            href: `/clinics?view=${row.id}`,
+          }))}
+        />
+        <SnapshotList
+          title="Drivers"
+          icon={<CarFront className="size-5" />}
+          tone="pink"
+          total={drivers.data?.meta.total ?? k?.totalDriverRegistrations}
+          viewAllTo="/drivers"
+          emptyText="No driver registrations yet."
+          loading={drivers.isLoading}
+          items={(drivers.data?.data ?? []).map((row) => ({
+            id: row.id,
+            name: row.name,
+            secondary: [vehicleLabel(row), row.city].filter(Boolean).join(' · '),
+            status: row.status,
+            href: `/drivers?view=${row.id}`,
+          }))}
+        />
+      </div>
     </div>
   )
+}
+
+function vehicleLabel(row: DriverRow) {
+  const parts = [row.vehicleType, row.vehicleNumber].filter(Boolean)
+  return parts.length ? parts.join(' ') : ''
 }
