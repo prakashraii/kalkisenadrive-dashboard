@@ -37,7 +37,7 @@ const nav = [
     ],
   },
   { to: '/videos', label: 'Video', icon: Video },
-  { to: '/payments', label: 'Bank & Payments', icon: CreditCard },
+  { to: '/payments', label: 'Manage Accounts', icon: CreditCard },
   { to: '/notifications', label: 'Push Notification', icon: Bell },
 ]
 
@@ -51,7 +51,7 @@ const titles: Record<string, string> = {
   '/books': 'Books Sell',
   '/books/orders': 'Book Orders',
   '/videos': 'Video',
-  '/payments': 'Bank & Payments',
+  '/payments': 'Manage Accounts',
   '/notifications': 'Push Notification',
 }
 
@@ -104,12 +104,17 @@ export function DashboardLayout() {
   const videoTitle = location.pathname === '/videos' ? (videoForm ? videoUploadTitle : 'Video') : null
   const paymentForm = location.pathname === '/payments' && params.get('form')
   const paymentView = location.pathname === '/payments' && params.get('view')
+  const paymentWallet = params.get('type') === 'wallet'
   const paymentTitle = location.pathname === '/payments'
     ? paymentForm
-      ? 'Payment Setting'
+      ? paymentWallet
+        ? paymentForm === 'new'
+          ? 'Add Wallet Details'
+          : 'Wallet Details'
+        : 'Payment Setting'
       : paymentView
         ? 'Payment Details'
-        : 'Bank & Payments'
+        : 'Manage Accounts'
     : null
   const title =
     formTitle ?? donationTitle ?? membershipTitle ?? clinicTitle ?? bookTitle ?? videoTitle ?? paymentTitle ?? titles[location.pathname] ?? 'Dashboard'
@@ -143,11 +148,14 @@ export function DashboardLayout() {
     </>
   ) : paymentForm ? (
     <>
-      Menu / Bank & Payments / <span className="text-[#7EB6FF]">Payment Setting</span>
+      Menu / Manage Accounts /{' '}
+      <span className="text-[#7EB6FF]">
+        {paymentWallet ? (params.get('form') === 'new' ? 'Add Wallet Details' : 'Wallet Details') : 'Payment Setting'}
+      </span>
     </>
   ) : paymentView ? (
     <>
-      Menu / Bank & Payments / <span className="text-[#7EB6FF]">Payment Details</span>
+      Menu / Manage Accounts / <span className="text-[#7EB6FF]">Payment Details</span>
     </>
   ) : location.pathname === '/clinics' ? (
     'Menu / Clinics List'
