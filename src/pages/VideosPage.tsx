@@ -1,98 +1,132 @@
+import { Play, Plus, Video as VideoIcon } from 'lucide-react'
 import { useState } from 'react'
-import { Formik } from 'formik'
-import * as Yup from 'yup'
-import { api } from '../lib/api'
-import { useAdminList, useAdminMutation } from '../viewmodels/useAdminCrud'
-import { DataTable } from '../components/ui/DataTable'
-import { Pagination } from '../components/ui/Pagination'
-import { TableToolbar } from '../components/ui/TableToolbar'
-import { StatusBadge } from '../components/ui/StatusBadge'
-import { ActionButtons, Modal } from '../components/ui/Actions'
+import { useSearchParams } from 'react-router-dom'
+import { VideoDetailsForm, type Video } from '../components/videos/VideoDetailsForm'
+import { ActionButtons } from '../components/ui/Actions'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
-import { FormActions, FormField, TextInput } from '../components/ui/FormField'
-
-type Video = {
-  id: string
-  title: string
-  description?: string | null
-  sourceUrl: string
-  published: boolean
-  sortOrder: number
-}
+import { Pagination } from '../components/ui/Pagination'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { TableToolbar } from '../components/ui/TableToolbar'
+import { api } from '../lib/api'
+import { isUploadedVideo, mediaUrl, videoThumbnail } from '../lib/media'
+import { useAdminList, useAdminMutation } from '../viewmodels/useAdminCrud'
 
 export function VideosPage() {
+  const [params, setParams] = useSearchParams()
+  const viewId = params.get('view')
+  const form = params.get('form')
   const list = useAdminList<Video>('videos', '/admin/videos')
   const mut = useAdminMutation(['videos'])
-  const [edit, setEdit] = useState<Video | null | 'new'>(null)
   const [del, setDel] = useState<Video | null>(null)
 
-  return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Videos</h2>
-        <button onClick={() => setEdit('new')} className="h-9 rounded-lg bg-violet-600 px-3 text-sm font-medium text-white">
-          Add video
+  if (form === 'new') {
+    return <VideoDetailsForm videoId="new" onClose={() => setParams({})} />
+  }
+
+  if (viewId) {
+    return <VideoDetailsForm videoId={viewId} onClose={() => setParams({})} />
+  }
+
+  const total = list.data?.meta.total ?? 0
+  const empty = !list.isLoading && total === 0 && !list.search
+
+  function openForm(tab: 'video' | 'link' = 'video') {
+    setParams({ form: 'new', tab })
+  }
+
+  if (empty) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6">
+        <div className="flex size-40 items-center justify-center rounded-full bg-white shadow-sm">
+          <VideoIcon className="size-16 text-[#020B17]" strokeWidth={1.25} />
+        </div>
+        <button
+          type="button"
+          onClick={() => openForm('video')}
+          className="inline-flex h-11 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white"
+        >
+          <Plus className="size-4" />
+          Add Video
         </button>
       </div>
-      <TableToolbar search={list.search} onSearch={list.setSearch} />
-      <DataTable columns={['Title', 'URL', 'Published', 'Order', 'Action']}>
-        {(list.data?.data ?? []).map((v) => (
-          <tr key={v.id}>
-            <td className="px-3 py-3 font-medium">{v.title}</td>
-            <td className="max-w-[240px] truncate px-3 py-3 text-xs">{v.sourceUrl}</td>
-            <td className="px-3 py-3">
-              <StatusBadge status={v.published ? 'APPROVED' : 'DRAFT'} />
-            </td>
-            <td className="px-3 py-3">{v.sortOrder}</td>
-            <td className="px-3 py-3">
-              <ActionButtons onEdit={() => setEdit(v)} onDelete={() => setDel(v)} />
-            </td>
-          </tr>
-        ))}
-      </DataTable>
-      <Pagination page={list.data?.meta.page ?? 1} pageCount={list.data?.meta.pageCount ?? 1} total={list.data?.meta.total ?? 0} limit={10} onPage={list.setPage} />
+    )
+  }
 
-      <Modal title={edit === 'new' ? 'Add video' : 'Edit video'} open={!!edit} onClose={() => setEdit(null)}>
-        {edit && (
-          <Formik
-            initialValues={
-              edit === 'new'
-                ? { title: '', description: '', sourceUrl: '', published: true, sortOrder: 0 }
-                : { title: edit.title, description: edit.description ?? '', sourceUrl: edit.sourceUrl, published: edit.published, sortOrder: edit.sortOrder }
-            }
-            validationSchema={Yup.object({ title: Yup.string().required(), sourceUrl: Yup.string().url().required() })}
-            onSubmit={async (values) => {
-              if (edit === 'new') await mut.mutateAsync(() => api.post('/admin/videos', values))
-              else await mut.mutateAsync(() => api.patch(`/admin/videos/${edit.id}`, values))
-              setEdit(null)
-            }}
+  return (
+    <div className="flex flex-col gap-8">
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-normal text-black">Video List</h2>
+          <button
+            type="button"
+            onClick={() => openForm('video')}
+            className="inline-flex h-11 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white"
           >
-            {(fk) => (
-              <form onSubmit={fk.handleSubmit} className="space-y-3">
-                <FormField label="Title" required>
-                  <TextInput name="title" value={fk.values.title} onChange={fk.handleChange} />
-                </FormField>
-                <FormField label="Source URL" required>
-                  <TextInput name="sourceUrl" value={fk.values.sourceUrl} onChange={fk.handleChange} />
-                </FormField>
-                <FormField label="Description">
-                  <TextInput name="description" value={fk.values.description} onChange={fk.handleChange} />
-                </FormField>
-                <label className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    name="published"
-                    checked={fk.values.published}
-                    onChange={(e) => void fk.setFieldValue('published', e.target.checked)}
-                  />
-                  Published
-                </label>
-                <FormActions onCancel={() => setEdit(null)} pending={fk.isSubmitting} />
-              </form>
-            )}
-          </Formik>
-        )}
-      </Modal>
+            <Plus className="size-4" />
+            Add Video
+          </button>
+        </div>
+        <TableToolbar search={list.search} onSearch={list.setSearch} />
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
+          {(list.data?.data ?? []).map((v) => {
+            const thumb = videoThumbnail(v)
+            const fileUrl = isUploadedVideo(v.sourceUrl)
+            return (
+              <article key={v.id} className="overflow-hidden rounded-xl bg-white shadow-sm">
+                <button
+                  type="button"
+                  onClick={() =>
+                    setParams({ view: v.id, tab: fileUrl ? 'video' : 'link' })
+                  }
+                  className="group relative block aspect-video w-full bg-[#E5E5E5]"
+                >
+                  {thumb ? (
+                    <img src={thumb} alt="" className="h-full w-full object-cover" />
+                  ) : fileUrl ? (
+                    <video src={mediaUrl(v.sourceUrl)} className="h-full w-full object-cover" muted />
+                  ) : (
+                    <div className="flex h-full items-center justify-center text-sm text-[#262626]/60">
+                      {v.title}
+                    </div>
+                  )}
+                  <span className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 transition group-hover:opacity-100">
+                    <span className="flex size-12 items-center justify-center rounded-full bg-white/90 text-[#020B17]">
+                      <Play className="size-5 fill-current" />
+                    </span>
+                  </span>
+                </button>
+                <div className="flex items-start justify-between gap-3 px-4 py-3">
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-medium text-[#262626]">{v.title}</h3>
+                    <p className="mt-1 text-xs text-[#262626]/60">
+                      {fileUrl ? 'Uploaded video' : 'Link'}
+                    </p>
+                  </div>
+                  <div className="flex shrink-0 flex-col items-end gap-2">
+                    <StatusBadge status={v.published ? 'APPROVED' : 'DRAFT'} />
+                    <ActionButtons
+                      onView={() =>
+                        setParams({
+                          view: v.id,
+                          tab: fileUrl ? 'video' : 'link',
+                        })
+                      }
+                      onDelete={() => setDel(v)}
+                    />
+                  </div>
+                </div>
+              </article>
+            )
+          })}
+        </div>
+        <Pagination
+          page={list.data?.meta.page ?? 1}
+          pageCount={list.data?.meta.pageCount ?? 1}
+          total={total}
+          limit={10}
+          onPage={list.setPage}
+        />
+      </section>
       <ConfirmDialog
         open={!!del}
         title="Remove video"

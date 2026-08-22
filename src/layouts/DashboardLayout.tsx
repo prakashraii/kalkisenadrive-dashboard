@@ -47,8 +47,8 @@ const titles: Record<string, string> = {
   '/donations': 'Donation',
   '/memberships': 'Membership',
   '/clinics': 'Clinic List',
-  '/drivers': 'Driver Registration',
-  '/books': 'Book',
+  '/drivers': 'Drivers List',
+  '/books': 'Books Sell',
   '/books/orders': 'Book Orders',
   '/videos': 'Video',
   '/payments': 'Bank & Payments',
@@ -96,7 +96,23 @@ export function DashboardLayout() {
   const membershipTitle = membershipView ? 'Member Details' : null
   const clinicView = location.pathname === '/clinics' && (params.get('view') || params.get('form'))
   const clinicTitle = location.pathname === '/clinics' ? (clinicView ? 'Clinic Details' : 'Clinic List') : null
-  const title = formTitle ?? donationTitle ?? membershipTitle ?? clinicTitle ?? titles[location.pathname] ?? 'Dashboard'
+  const bookForm = location.pathname === '/books' && params.get('form')
+  const bookView = location.pathname === '/books' && params.get('view')
+  const bookTitle = location.pathname === '/books' ? (bookForm ? 'Add Book' : bookView ? 'Book Details' : 'Books Sell') : null
+  const videoForm = location.pathname === '/videos' && (params.get('form') || params.get('view'))
+  const videoUploadTitle = params.get('tab') === 'link' ? 'Upload Link' : 'Upload Video'
+  const videoTitle = location.pathname === '/videos' ? (videoForm ? videoUploadTitle : 'Video') : null
+  const paymentForm = location.pathname === '/payments' && params.get('form')
+  const paymentView = location.pathname === '/payments' && params.get('view')
+  const paymentTitle = location.pathname === '/payments'
+    ? paymentForm
+      ? 'Payment Setting'
+      : paymentView
+        ? 'Payment Details'
+        : 'Bank & Payments'
+    : null
+  const title =
+    formTitle ?? donationTitle ?? membershipTitle ?? clinicTitle ?? bookTitle ?? videoTitle ?? paymentTitle ?? titles[location.pathname] ?? 'Dashboard'
   const crumb = formTitle ? (
     <>
       Menu / User List / <span className="text-[#7EB6FF]">{formTitle}</span>
@@ -113,8 +129,30 @@ export function DashboardLayout() {
     <>
       Menu / Clinic / <span className="text-[#7EB6FF]">Clinic Details</span>
     </>
+  ) : bookForm ? (
+    <>
+      Menu / Book / <span className="text-[#7EB6FF]">Add Book</span>
+    </>
+  ) : bookView ? (
+    <>
+      Menu / Book / <span className="text-[#7EB6FF]">Book Details</span>
+    </>
+  ) : videoForm ? (
+    <>
+      Menu / Video / <span className="text-[#7EB6FF]">{videoUploadTitle}</span>
+    </>
+  ) : paymentForm ? (
+    <>
+      Menu / Bank & Payments / <span className="text-[#7EB6FF]">Payment Setting</span>
+    </>
+  ) : paymentView ? (
+    <>
+      Menu / Bank & Payments / <span className="text-[#7EB6FF]">Payment Details</span>
+    </>
   ) : location.pathname === '/clinics' ? (
     'Menu / Clinics List'
+  ) : location.pathname === '/books' ? (
+    'Menu / Book Sell'
   ) : (
     `Menu / ${title}`
   )

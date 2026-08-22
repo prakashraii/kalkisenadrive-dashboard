@@ -40,6 +40,14 @@ export function flagEmoji(code?: string | null) {
     .replace(/./g, (c) => String.fromCodePoint(127397 + c.charCodeAt(0)))
 }
 
+export function assetUrl(path?: string | null) {
+  if (!path) return ''
+  if (/^https?:\/\//.test(path)) return path
+  const apiBase = import.meta.env.VITE_API_URL ?? 'http://localhost:3011/api/v1'
+  const origin = String(apiBase).replace(/\/api\/v1\/?$/, '')
+  return `${origin}${path.startsWith('/') ? path : `/${path}`}`
+}
+
 export function countryName(code?: string | null) {
   const names: Record<string, string> = {
     NP: 'Nepal',

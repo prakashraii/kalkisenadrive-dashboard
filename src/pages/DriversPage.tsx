@@ -1,120 +1,151 @@
-import { useState } from 'react'
-import { Formik } from 'formik'
-import * as Yup from 'yup'
-import { api } from '../lib/api'
-import { useAdminList, useAdminMutation } from '../viewmodels/useAdminCrud'
-import { DataTable } from '../components/ui/DataTable'
+import { useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { CarFront, ShieldCheck, UserX } from 'lucide-react'
+import { DriverDetailsForm } from '../components/drivers/DriverDetailsForm'
+import { ActionButtons } from '../components/ui/Actions'
+import { DataTable, TableFrame } from '../components/ui/DataTable'
+import { MetricCard } from '../components/ui/MetricCard'
 import { Pagination } from '../components/ui/Pagination'
-import { TableToolbar } from '../components/ui/TableToolbar'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { ActionButtons, Modal } from '../components/ui/Actions'
-import { FormActions, FormField, SelectField, TextInput } from '../components/ui/FormField'
+import { TableToolbar } from '../components/ui/TableToolbar'
+import { Tabs } from '../components/ui/Tabs'
+import { api } from '../lib/api'
+import { countryName, flagEmoji } from '../lib/cn'
+import { useAdminList } from '../viewmodels/useAdminCrud'
+
+type ListTab = 'all' | 'accepted' | 'rejected'
 
 type Driver = {
   id: string
   publicId: string
   name: string
   phone: string
-  licenseNumber: string
-  vehicleType: string
-  vehicleNumber: string
+  email?: string | null
   city?: string | null
+  countryCode?: string
   status: string
+  memberCode?: string | null
+  user?: { memberCode?: string | null } | null
+}
+
+const LIST_TABS: { id: ListTab; label: string; status?: 'APPROVED' | 'REJECTED' }[] = [
+  { id: 'all', label: 'All' },
+  { id: 'accepted', label: 'Accepted', status: 'APPROVED' },
+  { id: 'rejected', label: 'Rejected', status: 'REJECTED' },
+]
+
+const COLUMNS = ['ID', 'Driver Name', 'Contact Details', 'Member ID', 'Country', 'City', 'Status', 'Action']
+
+function listTabFromParam(value: string | null): ListTab {
+  return LIST_TABS.some((t) => t.id === value) ? (value as ListTab) : 'all'
 }
 
 export function DriversPage() {
-  const list = useAdminList<Driver>('drivers', '/admin/drivers')
-  const mut = useAdminMutation(['drivers'])
-  const [create, setCreate] = useState(false)
-  const [view, setView] = useState<Driver | null>(null)
+  const [params, setParams] = useSearchParams()
+  const viewId = params.get('view')
+  const isNew = params.get('form') === 'new'
+  const listTab = listTabFromParam(isNew || viewId ? 'all' : params.get('tab'))
+  const status = LIST_TABS.find((t) => t.id === listTab)?.status
+  const extra = useMemo(() => (status ? { status } : undefined), [status])
+  const list = useAdminList<Driver>(`drivers-${listTab}`, '/admin/drivers', extra)
+  const { data: stats } = useQuery({
+    queryKey: ['driver-stats'],
+    queryFn: async () => (await api.get<{ total: number; accepted: number; rejected: number }>('/admin/drivers/stats')).data,
+    enabled: !viewId && !isNew,
+  })
+
+  function changeTab(next: ListTab) {
+    list.setPage(1)
+    setParams({ tab: next })
+  }
+
+  if (isNew) {
+    return (
+      <DriverDetailsForm
+        onClose={() => setParams({ tab: 'all' })}
+        onCreated={(id) => setParams({ view: id, tab: 'details' })}
+      />
+    )
+  }
+
+  if (viewId) {
+    return <DriverDetailsForm driverId={viewId} onClose={() => setParams({ tab: 'all' })} />
+  }
 
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Driver Registration</h2>
-        <button onClick={() => setCreate(true)} className="h-9 rounded-lg bg-violet-600 px-3 text-sm font-medium text-white">
-          Add registration
-        </button>
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-wrap gap-4">
+        <MetricCard
+          title="Total Driver Registered"
+          value={stats?.total ?? 0}
+          icon={<CarFront className="size-6 text-[#C837AB]" />}
+        />
+        <MetricCard
+          title="Accepted Driver"
+          value={stats?.accepted ?? 0}
+          icon={<ShieldCheck className="size-6 text-[#34C759]" />}
+        />
+        <MetricCard title="Rejected" value={stats?.rejected ?? 0} icon={<UserX className="size-6 text-[#FF543E]" />} />
       </div>
-      <TableToolbar search={list.search} onSearch={list.setSearch} country={list.country} onCountry={list.setCountry} />
-      <DataTable columns={['ID', 'Name', 'Phone', 'License', 'Vehicle', 'City', 'Status', 'Action']}>
-        {(list.data?.data ?? []).map((d) => (
-          <tr key={d.id}>
-            <td className="px-3 py-3">{d.publicId}</td>
-            <td className="px-3 py-3 font-medium">{d.name}</td>
-            <td className="px-3 py-3">{d.phone}</td>
-            <td className="px-3 py-3">{d.licenseNumber}</td>
-            <td className="px-3 py-3">
-              {d.vehicleType} · {d.vehicleNumber}
-            </td>
-            <td className="px-3 py-3">{d.city}</td>
-            <td className="px-3 py-3">
-              <StatusBadge status={d.status} />
-            </td>
-            <td className="px-3 py-3">
-              <ActionButtons onView={() => setView(d)} />
-            </td>
-          </tr>
-        ))}
-      </DataTable>
-      <Pagination page={list.data?.meta.page ?? 1} pageCount={list.data?.meta.pageCount ?? 1} total={list.data?.meta.total ?? 0} limit={10} onPage={list.setPage} />
 
-      <Modal title="Driver" open={!!view} onClose={() => setView(null)}>
-        {view && (
-          <div className="space-y-3">
-            <p className="text-sm">
-              {view.name} · {view.vehicleType} {view.vehicleNumber}
-            </p>
-            {view.status === 'PENDING' && (
-              <div className="flex justify-end gap-2">
-                <button className="h-9 rounded-lg border px-3 text-sm" onClick={() => mut.mutateAsync(() => api.patch(`/admin/drivers/${view.id}/reject`)).then(() => setView(null))}>
-                  Reject
-                </button>
-                <button className="h-9 rounded-lg bg-emerald-600 px-3 text-sm text-white" onClick={() => mut.mutateAsync(() => api.patch(`/admin/drivers/${view.id}/approve`)).then(() => setView(null))}>
-                  Approve
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </Modal>
-
-      <Modal title="Add registration" open={create} onClose={() => setCreate(false)}>
-        <Formik
-          initialValues={{ name: '', phone: '', licenseNumber: '', vehicleType: 'Bike', vehicleNumber: '', city: '', countryCode: 'NP' }}
-          validationSchema={Yup.object({ name: Yup.string().required(), phone: Yup.string().required(), licenseNumber: Yup.string().required(), vehicleNumber: Yup.string().required() })}
-          onSubmit={async (values) => {
-            await mut.mutateAsync(() => api.post('/admin/drivers', values))
-            setCreate(false)
-          }}
-        >
-          {(fk) => (
-            <form onSubmit={fk.handleSubmit} className="space-y-3">
-              <FormField label="Name" required>
-                <TextInput name="name" value={fk.values.name} onChange={fk.handleChange} />
-              </FormField>
-              <FormField label="Phone" required>
-                <TextInput name="phone" value={fk.values.phone} onChange={fk.handleChange} />
-              </FormField>
-              <FormField label="License" required>
-                <TextInput name="licenseNumber" value={fk.values.licenseNumber} onChange={fk.handleChange} />
-              </FormField>
-              <SelectField label="Vehicle type" name="vehicleType" value={fk.values.vehicleType} onChange={fk.handleChange}>
-                <option>Bike</option>
-                <option>Car</option>
-                <option>Scooter</option>
-              </SelectField>
-              <FormField label="Vehicle number" required>
-                <TextInput name="vehicleNumber" value={fk.values.vehicleNumber} onChange={fk.handleChange} />
-              </FormField>
-              <FormField label="City">
-                <TextInput name="city" value={fk.values.city} onChange={fk.handleChange} />
-              </FormField>
-              <FormActions onCancel={() => setCreate(false)} pending={fk.isSubmitting} />
-            </form>
-          )}
-        </Formik>
-      </Modal>
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <Tabs tabs={LIST_TABS} value={listTab} onChange={changeTab} />
+          <button
+            type="button"
+            onClick={() => setParams({ form: 'new', tab: 'details' })}
+            className="inline-flex h-11 items-center rounded-md bg-[#020B17] px-4 text-sm text-white"
+          >
+            Add registration
+          </button>
+        </div>
+        <TableToolbar
+          search={list.search}
+          onSearch={list.setSearch}
+          country={list.country}
+          onCountry={list.setCountry}
+          from={list.from}
+          onFrom={list.setFrom}
+        />
+        <TableFrame>
+          <DataTable columns={COLUMNS}>
+            {(list.data?.data ?? []).map((d) => (
+              <tr key={d.id} className="text-[#262626]">
+                <td className="px-2.5 py-4">{d.publicId}</td>
+                <td className="px-2.5 py-4">{d.name}</td>
+                <td className="px-2.5 py-4 leading-[15px]">
+                  <div>{d.email || '—'}</div>
+                  <div>{d.phone}</div>
+                </td>
+                <td className="px-2.5 py-4">{d.memberCode ?? d.user?.memberCode ?? '—'}</td>
+                <td className="px-2.5 py-4">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="flex size-[18px] items-center justify-center overflow-hidden rounded-full text-[11px] leading-none">
+                      {flagEmoji(d.countryCode)}
+                    </span>
+                    {countryName(d.countryCode)}
+                  </span>
+                </td>
+                <td className="px-2.5 py-4">{d.city || '—'}</td>
+                <td className="px-2.5 py-4">
+                  <StatusBadge status={d.status} />
+                </td>
+                <td className="px-2.5 py-4">
+                  <ActionButtons onView={() => setParams({ view: d.id, tab: 'details' })} />
+                </td>
+              </tr>
+            ))}
+          </DataTable>
+          <Pagination
+            page={list.data?.meta.page ?? 1}
+            pageCount={list.data?.meta.pageCount ?? 1}
+            total={list.data?.meta.total ?? 0}
+            limit={10}
+            onPage={list.setPage}
+          />
+        </TableFrame>
+      </section>
     </div>
   )
 }

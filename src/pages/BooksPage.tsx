@@ -1,110 +1,105 @@
-import { useState } from 'react'
-import { Formik } from 'formik'
-import * as Yup from 'yup'
-import { api } from '../lib/api'
-import { useAdminList, useAdminMutation } from '../viewmodels/useAdminCrud'
-import { DataTable } from '../components/ui/DataTable'
+import { BookOpen, Plus } from 'lucide-react'
+import { useSearchParams } from 'react-router-dom'
+import { BookDetailsForm, type Book } from '../components/books/BookDetailsForm'
+import { ActionButtons } from '../components/ui/Actions'
+import { DataTable, TableFrame } from '../components/ui/DataTable'
 import { Pagination } from '../components/ui/Pagination'
-import { TableToolbar } from '../components/ui/TableToolbar'
 import { StatusBadge } from '../components/ui/StatusBadge'
-import { ActionButtons, Modal } from '../components/ui/Actions'
-import { ConfirmDialog } from '../components/ui/ConfirmDialog'
-import { FormActions, FormField, SelectField, TextInput } from '../components/ui/FormField'
+import { TableToolbar } from '../components/ui/TableToolbar'
 import { formatMoney } from '../lib/cn'
+import { useAdminList } from '../viewmodels/useAdminCrud'
 
-type Book = {
-  id: string
-  title: string
-  author: string
-  priceCents: number
-  stock: number
-  status: string
+const COLUMNS = ['Title', 'Author', 'Type', 'Price', 'Stock', 'Language', 'Status', 'Membership', 'Action']
+
+const LANGUAGE_LABEL: Record<string, string> = {
+  en: 'English',
+  np: 'Nepali',
+  hi: 'Hindi',
 }
 
 export function BooksPage() {
+  const [params, setParams] = useSearchParams()
+  const viewId = params.get('view')
+  const form = params.get('form')
   const list = useAdminList<Book>('books', '/admin/books')
-  const mut = useAdminMutation(['books'])
-  const [edit, setEdit] = useState<Book | null | 'new'>(null)
-  const [del, setDel] = useState<Book | null>(null)
 
-  return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Book list</h2>
-        <button onClick={() => setEdit('new')} className="h-9 rounded-lg bg-violet-600 px-3 text-sm font-medium text-white">
-          Add book
+  if (form === 'new') {
+    return <BookDetailsForm bookId="new" onClose={() => setParams({})} />
+  }
+
+  if (viewId) {
+    return <BookDetailsForm bookId={viewId} onClose={() => setParams({})} />
+  }
+
+  const total = list.data?.meta.total ?? 0
+  const empty = !list.isLoading && total === 0 && !list.search
+
+  if (empty) {
+    return (
+      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-6">
+        <div className="flex size-40 items-center justify-center rounded-full bg-white shadow-sm">
+          <BookOpen className="size-16 text-[#020B17]" strokeWidth={1.25} />
+        </div>
+        <button
+          type="button"
+          onClick={() => setParams({ form: 'new' })}
+          className="inline-flex h-11 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white"
+        >
+          <Plus className="size-4" />
+          Add Book
         </button>
       </div>
-      <TableToolbar search={list.search} onSearch={list.setSearch} />
-      <DataTable columns={['Title', 'Author', 'Price', 'Stock', 'Status', 'Action']}>
-        {(list.data?.data ?? []).map((b) => (
-          <tr key={b.id}>
-            <td className="px-3 py-3 font-medium">{b.title}</td>
-            <td className="px-3 py-3">{b.author}</td>
-            <td className="px-3 py-3">{formatMoney(b.priceCents)}</td>
-            <td className="px-3 py-3">{b.stock}</td>
-            <td className="px-3 py-3">
-              <StatusBadge status={b.status} />
-            </td>
-            <td className="px-3 py-3">
-              <ActionButtons onEdit={() => setEdit(b)} onDelete={() => setDel(b)} />
-            </td>
-          </tr>
-        ))}
-      </DataTable>
-      <Pagination page={list.data?.meta.page ?? 1} pageCount={list.data?.meta.pageCount ?? 1} total={list.data?.meta.total ?? 0} limit={10} onPage={list.setPage} />
+    )
+  }
 
-      <Modal title={edit === 'new' ? 'Add book' : 'Edit book'} open={!!edit} onClose={() => setEdit(null)}>
-        {edit && (
-          <Formik
-            initialValues={
-              edit === 'new'
-                ? { title: '', author: '', priceCents: 50000, stock: 10, status: 'AVAILABLE' }
-                : { title: edit.title, author: edit.author, priceCents: edit.priceCents, stock: edit.stock, status: edit.status }
-            }
-            validationSchema={Yup.object({ title: Yup.string().required(), author: Yup.string().required() })}
-            onSubmit={async (values) => {
-              if (edit === 'new') await mut.mutateAsync(() => api.post('/admin/books', values))
-              else await mut.mutateAsync(() => api.patch(`/admin/books/${edit.id}`, values))
-              setEdit(null)
-            }}
+  return (
+    <div className="flex flex-col gap-8">
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-normal text-black">Book List</h2>
+          <button
+            type="button"
+            onClick={() => setParams({ form: 'new' })}
+            className="inline-flex h-11 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white"
           >
-            {(fk) => (
-              <form onSubmit={fk.handleSubmit} className="space-y-3">
-                <FormField label="Title" required>
-                  <TextInput name="title" value={fk.values.title} onChange={fk.handleChange} />
-                </FormField>
-                <FormField label="Author" required>
-                  <TextInput name="author" value={fk.values.author} onChange={fk.handleChange} />
-                </FormField>
-                <FormField label="Price (paisa)">
-                  <TextInput type="number" name="priceCents" value={fk.values.priceCents} onChange={fk.handleChange} />
-                </FormField>
-                <FormField label="Stock">
-                  <TextInput type="number" name="stock" value={fk.values.stock} onChange={fk.handleChange} />
-                </FormField>
-                <SelectField label="Status" name="status" value={fk.values.status} onChange={fk.handleChange}>
-                  <option>AVAILABLE</option>
-                  <option>OUT_OF_STOCK</option>
-                  <option>INACTIVE</option>
-                </SelectField>
-                <FormActions onCancel={() => setEdit(null)} pending={fk.isSubmitting} />
-              </form>
-            )}
-          </Formik>
-        )}
-      </Modal>
-      <ConfirmDialog
-        open={!!del}
-        title="Remove book"
-        message="The book will be archived."
-        onClose={() => setDel(null)}
-        onConfirm={async () => {
-          if (!del) return
-          await mut.mutateAsync(() => api.delete(`/admin/books/${del.id}`))
-          setDel(null)
-        }}
-      />
+            <Plus className="size-4" />
+            Add Book
+          </button>
+        </div>
+        <TableToolbar search={list.search} onSearch={list.setSearch} />
+        <TableFrame>
+          <DataTable columns={COLUMNS}>
+            {(list.data?.data ?? []).map((b) => (
+              <tr key={b.id} className="text-[#262626]">
+                <td className="px-2.5 py-4 font-medium">{b.title}</td>
+                <td className="px-2.5 py-4">{b.author}</td>
+                <td className="px-2.5 py-4">{b.type === 'DIGITAL' ? 'Digital' : 'Physical'}</td>
+                <td className="px-2.5 py-4">{formatMoney(b.priceCents)}</td>
+                <td className="px-2.5 py-4">{b.stock}</td>
+                <td className="px-2.5 py-4">{LANGUAGE_LABEL[b.language] ?? b.language}</td>
+                <td className="px-2.5 py-4">
+                  <StatusBadge status={b.status} />
+                </td>
+                <td className="px-2.5 py-4">
+                  <span className="inline-flex rounded-full bg-[#E8F5E9] px-2 py-1 text-[11px] font-medium text-[#1B5E20]">
+                    2 year free
+                  </span>
+                </td>
+                <td className="px-2.5 py-4">
+                  <ActionButtons onView={() => setParams({ view: b.id })} />
+                </td>
+              </tr>
+            ))}
+          </DataTable>
+          <Pagination
+            page={list.data?.meta.page ?? 1}
+            pageCount={list.data?.meta.pageCount ?? 1}
+            total={total}
+            limit={10}
+            onPage={list.setPage}
+          />
+        </TableFrame>
+      </section>
     </div>
   )
 }
