@@ -46,7 +46,7 @@ const titles: Record<string, string> = {
   '/users': 'User List',
   '/donations': 'Donation',
   '/memberships': 'Membership',
-  '/clinics': 'Kalki Sena Clinic',
+  '/clinics': 'Clinic List',
   '/drivers': 'Driver Registration',
   '/books': 'Book',
   '/books/orders': 'Book Orders',
@@ -77,7 +77,12 @@ export function DashboardLayout() {
 
   const params = new URLSearchParams(location.search)
   const formMode = params.get('form')
-  const formTitle = formMode === 'new' ? 'Add User' : formMode === 'edit' || formMode === 'view' ? 'User Details' : null
+  const formTitle =
+    location.pathname === '/users' && formMode
+      ? formMode === 'new'
+        ? 'Add User'
+        : 'User Details'
+      : null
   const donationTabLabels: Record<string, string> = {
     all: 'Donation',
     dowry: 'Dowry Donation',
@@ -89,7 +94,9 @@ export function DashboardLayout() {
   const donationTitle = location.pathname === '/donations' ? (donationView ? 'User Details' : donationTabLabel) : null
   const membershipView = location.pathname === '/memberships' && params.get('view')
   const membershipTitle = membershipView ? 'Member Details' : null
-  const title = formTitle ?? donationTitle ?? membershipTitle ?? titles[location.pathname] ?? 'Dashboard'
+  const clinicView = location.pathname === '/clinics' && (params.get('view') || params.get('form'))
+  const clinicTitle = location.pathname === '/clinics' ? (clinicView ? 'Clinic Details' : 'Clinic List') : null
+  const title = formTitle ?? donationTitle ?? membershipTitle ?? clinicTitle ?? titles[location.pathname] ?? 'Dashboard'
   const crumb = formTitle ? (
     <>
       Menu / User List / <span className="text-[#7EB6FF]">{formTitle}</span>
@@ -102,6 +109,12 @@ export function DashboardLayout() {
     <>
       Menu / Membership / <span className="text-[#7EB6FF]">Member Details</span>
     </>
+  ) : clinicView ? (
+    <>
+      Menu / Clinic / <span className="text-[#7EB6FF]">Clinic Details</span>
+    </>
+  ) : location.pathname === '/clinics' ? (
+    'Menu / Clinics List'
   ) : (
     `Menu / ${title}`
   )
