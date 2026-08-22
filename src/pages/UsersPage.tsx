@@ -1,16 +1,23 @@
 import { useState } from 'react'
-import { Formik } from 'formik'
-import * as Yup from 'yup'
-import { api } from '../lib/api'
-import { useAdminList, useAdminMutation } from '../viewmodels/useAdminCrud'
-import { DataTable } from '../components/ui/DataTable'
-import { Pagination } from '../components/ui/Pagination'
-import { TableToolbar } from '../components/ui/TableToolbar'
-import { StatusBadge } from '../components/ui/StatusBadge'
+import { useNavigate } from 'react-router-dom'
+import { useQuery } from '@tanstack/react-query'
+import { BookOpen, Building2, CarFront, HeartHandshake, Plus, Users } from 'lucide-react'
+import { api, type PaymentRow } from '../lib/api'
+import { countryName, flagEmoji } from '../lib/cn'
 import { ActionButtons, Modal } from '../components/ui/Actions'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
-import { FormActions, FormField, SelectField, TextInput } from '../components/ui/FormField'
-import { flagEmoji, countryName } from '../lib/cn'
+import { DataTable, TableFrame } from '../components/ui/DataTable'
+import { DetailList } from '../components/ui/DetailList'
+import { MetricCard } from '../components/ui/MetricCard'
+import { Pagination } from '../components/ui/Pagination'
+import { PaymentTable } from '../components/ui/PaymentTable'
+import { StatusBadge } from '../components/ui/StatusBadge'
+import { TableToolbar } from '../components/ui/TableToolbar'
+import { Tabs } from '../components/ui/Tabs'
+import { UserDetailsForm } from '../components/users/UserDetailsForm'
+import { useAdminList, useAdminMutation } from '../viewmodels/useAdminCrud'
+
+type Tab = 'all' | 'donations' | 'members' | 'drivers' | 'buyers'
 
 type User = {
   id: string
@@ -24,99 +31,255 @@ type User = {
   status: string
 }
 
-const schema = Yup.object({
-  name: Yup.string().required('Required'),
-  phone: Yup.string().matches(/^[0-9]{10}$/, '10-digit phone').required('Required'),
-  email: Yup.string().email().nullable(),
-  city: Yup.string(),
-  countryCode: Yup.string().required(),
-  status: Yup.string().required(),
-})
+type Driver = {
+  id: string
+  publicId: string
+  name: string
+  phone: string
+  licenseNumber: string
+  vehicleType: string
+  vehicleNumber: string
+  city?: string | null
+  status: string
+}
+
+type Order = {
+  id: string
+  publicId: string
+  userName: string
+  transId: string
+  amountCents: number
+  method: string
+  city?: string | null
+  status: string
+  items: { titleSnapshot: string; qty: number }[]
+}
+
+const TABS: { id: Tab; label: string; path: string }[] = [
+  { id: 'all', label: 'All', path: '/admin/users' },
+  { id: 'donations', label: 'Donation Users', path: '/admin/donations' },
+  { id: 'members', label: 'Members', path: '/admin/memberships' },
+  { id: 'drivers', label: 'Drivers', path: '/admin/drivers' },
+  { id: 'buyers', label: 'Book Buyers', path: '/admin/book-orders' },
+]
+
+const USER_COLUMNS = ['ID', 'User Name', 'Contact Details', 'Member ID', 'Country', 'City', 'Status', 'Action']
+const DRIVER_COLUMNS = ['ID', 'User Name', 'Contact Details', 'License', 'Vehicle', 'City', 'Status', 'Action']
+const ORDER_COLUMNS = ['ID', 'User Name', 'Items', 'City', 'Amount', 'Bank/Wallet', 'Trans. ID', 'Status', 'Action']
 
 export function UsersPage() {
-  const list = useAdminList<User>('users', '/admin/users')
-  const mut = useAdminMutation(['users'])
-  const [edit, setEdit] = useState<User | null | 'new'>(null)
+  const navigate = useNavigate()
+  const [tab, setTab] = useState<Tab>('donations')
+  const path = TABS.find((t) => t.id === tab)!.path
+  const list = useAdminList(tab, path)
+  const mut = useAdminMutation(['users', 'donations', 'members', 'drivers', 'book-orders', 'dashboard-summary'])
+  const [edit, setEdit] = useState<User | 'new' | null>(null)
   const [del, setDel] = useState<User | null>(null)
+  const [view, setView] = useState<PaymentRow | Driver | Order | User | null>(null)
+
+  function openForm(next: User | 'new') {
+    setEdit(next)
+    navigate(next === 'new' ? '/users?form=new' : '/users?form=edit')
+  }
+
+  function closeForm() {
+    setEdit(null)
+    navigate('/users')
+  }
+
+  const { data: summary } = useQuery({
+    queryKey: ['dashboard-summary'],
+    queryFn: async () => (await api.get('/admin/dashboard/summary')).data as {
+      kpis: {
+        totalAppUsers: number
+        totalBookOrders: number
+        totalClinicMembers: number
+        totalDriverRegistrations: number
+      }
+    },
+  })
+  const { data: donatedTotal } = useQuery({
+    queryKey: ['donations-count'],
+    queryFn: async () => (await api.get('/admin/donations', { params: { limit: 1 } })).data.meta.total as number,
+  })
+
+  function changeTab(next: Tab) {
+    setTab(next)
+    list.setPage(1)
+  }
+
+  const k = summary?.kpis
+  const paymentTabs = tab === 'donations' || tab === 'members'
+
+  if (edit) {
+    return <UserDetailsForm edit={edit} onClose={closeForm} />
+  }
 
   return (
-    <div className="rounded-2xl bg-white p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Users</h2>
-        <button onClick={() => setEdit('new')} className="h-9 rounded-lg bg-violet-600 px-3 text-sm font-medium text-white">
-          Add user
-        </button>
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-wrap gap-4">
+        <MetricCard
+          title="Total Users"
+          value={k?.totalAppUsers ?? 0}
+          icon={<Users className="size-6 text-[#00A419]" />}
+        />
+        <MetricCard
+          title="Total User Donated"
+          value={donatedTotal ?? 0}
+          icon={<HeartHandshake className="size-6 text-[#FF543E]" />}
+        />
+        <MetricCard
+          title="Book Buyers"
+          value={k?.totalBookOrders ?? 0}
+          icon={<BookOpen className="size-6 text-[#9747FF]" />}
+        />
+        <MetricCard
+          title="Clinic Members"
+          value={k?.totalClinicMembers ?? 0}
+          icon={<Building2 className="size-6 text-[#009EE8]" />}
+        />
+        <MetricCard
+          title="User Register as Driver"
+          value={k?.totalDriverRegistrations ?? 0}
+          icon={<CarFront className="size-6 text-[#C837AB]" />}
+        />
       </div>
-      <TableToolbar search={list.search} onSearch={list.setSearch} country={list.country} onCountry={list.setCountry} from={list.from} onFrom={list.setFrom} />
-      <DataTable columns={['ID', 'Name', 'Contact', 'Member ID', 'Country', 'City', 'Status', 'Action']}>
-        {(list.data?.data ?? []).map((u) => (
-          <tr key={u.id}>
-            <td className="px-3 py-3">{u.publicId}</td>
-            <td className="px-3 py-3 font-medium">{u.name}</td>
-            <td className="px-3 py-3 text-xs">
-              {u.email}
-              <br />
-              {u.phone}
-            </td>
-            <td className="px-3 py-3">{u.memberCode}</td>
-            <td className="px-3 py-3">
-              {flagEmoji(u.countryCode)} {countryName(u.countryCode)}
-            </td>
-            <td className="px-3 py-3">{u.city}</td>
-            <td className="px-3 py-3">
-              <StatusBadge status={u.status} />
-            </td>
-            <td className="px-3 py-3">
-              <ActionButtons onEdit={() => setEdit(u)} onDelete={() => setDel(u)} />
-            </td>
-          </tr>
-        ))}
-      </DataTable>
-      <Pagination page={list.data?.meta.page ?? 1} pageCount={list.data?.meta.pageCount ?? 1} total={list.data?.meta.total ?? 0} limit={10} onPage={list.setPage} />
 
-      <Modal title={edit === 'new' ? 'Add user' : 'Edit user'} open={!!edit} onClose={() => setEdit(null)}>
-        {edit && (
-          <Formik
-            initialValues={
-              edit === 'new'
-                ? { name: '', phone: '', email: '', city: '', countryCode: 'NP', status: 'ACTIVE' }
-                : { name: edit.name, phone: edit.phone, email: edit.email ?? '', city: edit.city ?? '', countryCode: edit.countryCode, status: edit.status }
-            }
-            validationSchema={schema}
-            onSubmit={async (values) => {
-              if (edit === 'new') await mut.mutateAsync(() => api.post('/admin/users', values))
-              else await mut.mutateAsync(() => api.patch(`/admin/users/${edit.id}`, values))
-              setEdit(null)
-            }}
+      <section className="flex flex-col gap-4">
+        <div className="flex items-center justify-between gap-3">
+          <h2 className="text-xl font-normal text-black">User List</h2>
+          <button
+            type="button"
+            onClick={() => openForm('new')}
+            className="inline-flex h-11 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white"
           >
-            {(fk) => (
-              <form onSubmit={fk.handleSubmit} className="space-y-3">
-                <FormField label="Name" required error={fk.touched.name ? fk.errors.name : undefined}>
-                  <TextInput name="name" value={fk.values.name} onChange={fk.handleChange} />
-                </FormField>
-                <FormField label="Phone" required error={fk.touched.phone ? fk.errors.phone : undefined}>
-                  <TextInput name="phone" value={fk.values.phone} onChange={fk.handleChange} />
-                </FormField>
-                <FormField label="Email">
-                  <TextInput name="email" value={fk.values.email} onChange={fk.handleChange} />
-                </FormField>
-                <FormField label="City">
-                  <TextInput name="city" value={fk.values.city} onChange={fk.handleChange} />
-                </FormField>
-                <SelectField label="Country" name="countryCode" value={fk.values.countryCode} onChange={fk.handleChange}>
-                  <option value="NP">Nepal</option>
-                  <option value="US">USA</option>
-                  <option value="GB">UK</option>
-                </SelectField>
-                <SelectField label="Status" name="status" value={fk.values.status} onChange={fk.handleChange}>
-                  <option>ACTIVE</option>
-                  <option>INACTIVE</option>
-                  <option>SUSPENDED</option>
-                </SelectField>
-                <FormActions onCancel={() => setEdit(null)} pending={fk.isSubmitting} />
-              </form>
-            )}
-          </Formik>
+            <Plus className="size-4" />
+            Add user
+          </button>
+        </div>
+        <Tabs tabs={TABS} value={tab} onChange={changeTab} />
+        <TableToolbar
+          search={list.search}
+          onSearch={list.setSearch}
+          country={list.country}
+          onCountry={list.setCountry}
+          from={list.from}
+          onFrom={list.setFrom}
+        />
+        <TableFrame>
+          {tab === 'all' && (
+            <DataTable columns={USER_COLUMNS}>
+              {((list.data?.data ?? []) as User[]).map((u) => (
+                <tr key={u.id} className="text-[#262626]">
+                  <td className="px-2.5 py-4">{u.publicId}</td>
+                  <td className="px-2.5 py-4">{u.name}</td>
+                  <td className="px-2.5 py-4 leading-[15px]">
+                    <div>{u.email}</div>
+                    <div>{u.phone}</div>
+                  </td>
+                  <td className="px-2.5 py-4">{u.memberCode}</td>
+                  <td className="px-2.5 py-4">
+                    <span className="inline-flex items-center gap-2">
+                      <span className="flex size-[18px] items-center justify-center overflow-hidden rounded-full text-[11px] leading-none">
+                        {flagEmoji(u.countryCode)}
+                      </span>
+                      {countryName(u.countryCode)}
+                    </span>
+                  </td>
+                  <td className="px-2.5 py-4">{u.city}</td>
+                  <td className="px-2.5 py-4">
+                    <StatusBadge status={u.status} />
+                  </td>
+                  <td className="px-2.5 py-4">
+                    <ActionButtons onView={() => setView(u)} onEdit={() => openForm(u)} onDelete={() => setDel(u)} />
+                  </td>
+                </tr>
+              ))}
+            </DataTable>
+          )}
+          {paymentTabs && <PaymentTable rows={(list.data?.data ?? []) as PaymentRow[]} onView={setView} />}
+          {tab === 'drivers' && (
+            <DataTable columns={DRIVER_COLUMNS}>
+              {((list.data?.data ?? []) as Driver[]).map((d) => (
+                <tr key={d.id} className="text-[#262626]">
+                  <td className="px-2.5 py-4">{d.publicId}</td>
+                  <td className="px-2.5 py-4">{d.name}</td>
+                  <td className="px-2.5 py-4">{d.phone}</td>
+                  <td className="px-2.5 py-4">{d.licenseNumber}</td>
+                  <td className="px-2.5 py-4">
+                    {d.vehicleType} · {d.vehicleNumber}
+                  </td>
+                  <td className="px-2.5 py-4">{d.city}</td>
+                  <td className="px-2.5 py-4">
+                    <StatusBadge status={d.status} />
+                  </td>
+                  <td className="px-2.5 py-4">
+                    <ActionButtons onView={() => setView(d)} />
+                  </td>
+                </tr>
+              ))}
+            </DataTable>
+          )}
+          {tab === 'buyers' && (
+            <DataTable columns={ORDER_COLUMNS}>
+              {((list.data?.data ?? []) as Order[]).map((o) => (
+                <tr key={o.id} className="text-[#262626]">
+                  <td className="px-2.5 py-4">{o.publicId}</td>
+                  <td className="px-2.5 py-4">{o.userName}</td>
+                  <td className="px-2.5 py-4">{o.items.map((i) => `${i.titleSnapshot} ×${i.qty}`).join(', ')}</td>
+                  <td className="px-2.5 py-4">{o.city}</td>
+                  <td className="px-2.5 py-4">{(o.amountCents / 100).toLocaleString('en-NP')}/-</td>
+                  <td className="px-2.5 py-4">{o.method === 'WALLET' ? 'Wallet' : 'Bank'}</td>
+                  <td className="px-2.5 py-4">{o.transId}</td>
+                  <td className="px-2.5 py-4">
+                    <StatusBadge status={o.status} />
+                  </td>
+                  <td className="px-2.5 py-4">
+                    <ActionButtons onView={() => setView(o)} />
+                  </td>
+                </tr>
+              ))}
+            </DataTable>
+          )}
+          <Pagination
+            page={list.data?.meta.page ?? 1}
+            pageCount={list.data?.meta.pageCount ?? 1}
+            total={list.data?.meta.total ?? 0}
+            limit={10}
+            onPage={list.setPage}
+          />
+        </TableFrame>
+      </section>
+
+      <Modal title="Details" open={!!view} onClose={() => setView(null)}>
+        {view && 'userName' in view && 'amountCents' in view && (
+          <DetailList
+            items={[
+              { label: 'User', value: view.userName },
+              { label: 'Amount', value: String((view as PaymentRow).amountCents / 100) },
+              { label: 'Status', value: view.status },
+            ]}
+          />
+        )}
+        {view && 'memberCode' in view && (
+          <DetailList
+            items={[
+              { label: 'Name', value: (view as User).name },
+              { label: 'Member ID', value: (view as User).memberCode },
+              { label: 'Phone', value: (view as User).phone },
+              { label: 'Status', value: view.status },
+            ]}
+          />
+        )}
+        {view && 'licenseNumber' in view && (
+          <DetailList
+            items={[
+              { label: 'Name', value: (view as Driver).name },
+              { label: 'License', value: (view as Driver).licenseNumber },
+              { label: 'Vehicle', value: `${(view as Driver).vehicleType} ${(view as Driver).vehicleNumber}` },
+              { label: 'Status', value: view.status },
+            ]}
+          />
         )}
       </Modal>
       <ConfirmDialog

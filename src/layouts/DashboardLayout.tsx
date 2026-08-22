@@ -43,7 +43,7 @@ const nav = [
 
 const titles: Record<string, string> = {
   '/': 'Dashboard',
-  '/users': 'Users',
+  '/users': 'User List',
   '/donations': 'Donation',
   '/memberships': 'Membership',
   '/clinics': 'Kalki Sena Clinic',
@@ -75,7 +75,16 @@ export function DashboardLayout() {
     enabled: !!admin,
   })
 
-  const title = titles[location.pathname] ?? 'Dashboard'
+  const formMode = new URLSearchParams(location.search).get('form')
+  const formTitle = formMode === 'new' ? 'Add User' : formMode === 'edit' ? 'User Details' : null
+  const title = formTitle ?? titles[location.pathname] ?? 'Dashboard'
+  const crumb = formTitle ? (
+    <>
+      Menu / User List / <span className="text-[#7EB6FF]">{formTitle}</span>
+    </>
+  ) : (
+    `Menu / ${title}`
+  )
 
   async function logout() {
     await api.post('/admin/auth/logout')
@@ -85,8 +94,8 @@ export function DashboardLayout() {
 
   return (
     <div className="flex min-h-screen bg-page">
-      <aside className={cn('flex h-screen flex-col bg-sidebar text-white transition-all', collapsed ? 'w-[76px]' : 'w-[250px]')}>
-        <div className="flex h-[88px] items-center justify-center gap-2 border-b border-white/10 px-3">
+      <aside className={cn('flex h-screen flex-col bg-sidebar text-white transition-all', collapsed ? 'w-[76px]' : 'w-[198px]')}>
+        <div className="flex h-[65px] items-center justify-center gap-2 px-3">
           <img src="/logo.svg" alt="Kalki Sena Drive" className="h-12 w-12 rounded-full object-cover" />
           {!collapsed && (
             <div className="leading-tight">
@@ -95,7 +104,7 @@ export function DashboardLayout() {
             </div>
           )}
         </div>
-        <nav className="flex-1 space-y-1 overflow-y-auto px-3 py-4">
+        <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
           {nav.map((item) =>
             'children' in item && item.children ? (
               <NavGroup key={item.label} item={item} collapsed={collapsed} />
@@ -106,37 +115,37 @@ export function DashboardLayout() {
         </nav>
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-[72px] items-center gap-4 border-b border-slate-200 bg-white px-6">
-          <button onClick={() => setCollapsed((v) => !v)} className="rounded p-1 hover:bg-slate-100">
-            <Menu className="size-5 text-slate-600" />
+        <header className="flex h-[82px] items-center gap-6 bg-header px-8 shadow-[0_-2px_14px_rgba(0,0,0,0.25)]">
+          <button onClick={() => setCollapsed((v) => !v)} className="rounded p-1 hover:bg-white/10">
+            <Menu className="size-5 text-white" />
           </button>
           <div>
-            <h1 className="text-lg font-semibold text-slate-900">{title}</h1>
-            <p className="text-xs text-slate-400">Menu / {title}</p>
+            <h1 className="text-2xl font-normal text-white">{title}</h1>
+            <p className="text-xs text-white/80">{crumb}</p>
           </div>
-          <div className="mx-auto hidden w-full max-w-md md:block">
-            <label className="flex h-10 items-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 text-sm">
-              <Search className="size-4 text-slate-400" />
-              <input placeholder="Type to search..." className="w-full bg-transparent outline-none" />
+          <div className="mx-auto hidden w-full max-w-xl flex-1 md:block">
+            <label className="flex h-11 items-center gap-2.5 rounded-md border border-white/30 px-4 text-xs">
+              <Search className="size-5 text-white/60" />
+              <input placeholder="Type to search..." className="w-full bg-transparent text-white outline-none placeholder:text-white/60" />
             </label>
           </div>
-          <div className="ml-auto flex items-center gap-3">
-            <button className="relative rounded-full p-2 hover:bg-slate-100" onClick={() => navigate('/notifications')}>
-              <Bell className="size-5 text-slate-600" />
-              {notes?.unread > 0 && <span className="absolute right-1.5 top-1.5 size-2 rounded-full bg-rose-500" />}
+          <div className="ml-auto flex items-center gap-6">
+            <button className="relative flex size-[58px] items-center justify-center rounded-full bg-white/20" onClick={() => navigate('/notifications')}>
+              <Bell className="size-8 text-white" />
+              {notes?.unread > 0 && <span className="absolute right-3.5 top-3.5 size-2 rounded-full bg-red-500" />}
             </button>
             <div className="relative">
-              <button onClick={() => setMenuOpen((v) => !v)} className="flex items-center gap-2">
-                <img
-                  src={admin?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(admin?.name ?? 'Admin')}&background=6d5efc&color=fff`}
-                  alt=""
-                  className="size-9 rounded-full object-cover"
-                />
-                <div className="hidden text-left sm:block">
-                  <p className="text-sm font-medium">{admin?.name ?? 'Admin'}</p>
-                  <p className="text-xs text-slate-400">{admin?.role === 'SUPER_ADMIN' ? 'Admin' : admin?.role ?? 'Admin'}</p>
+              <button onClick={() => setMenuOpen((v) => !v)} className="flex items-center gap-2.5">
+                <div className="hidden text-right sm:block">
+                  <p className="text-base text-white">{admin?.name ?? 'Admin'}</p>
+                  <p className="text-xs font-semibold text-[#AEAEB2]">{admin?.role === 'SUPER_ADMIN' ? 'Admin' : admin?.role ?? 'Admin'}</p>
                 </div>
-                <ChevronDown className="size-4 text-slate-400" />
+                <img
+                  src={admin?.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(admin?.name ?? 'Admin')}&background=001E5E&color=fff`}
+                  alt=""
+                  className="size-[50px] rounded-full object-cover"
+                />
+                <ChevronDown className="size-3 text-white" />
               </button>
               {menuOpen && (
                 <div className="absolute right-0 z-20 mt-2 w-40 rounded-lg border border-slate-200 bg-white py-1 shadow-lg">
@@ -148,7 +157,7 @@ export function DashboardLayout() {
             </div>
           </div>
         </header>
-        <main className="min-h-0 flex-1 overflow-y-auto p-5">
+        <main className="min-h-0 flex-1 overflow-y-auto px-8 py-8">
           <Outlet />
         </main>
       </div>
@@ -169,8 +178,8 @@ function NavItem({
       end={item.end}
       className={({ isActive }) =>
         cn(
-          'flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/70 hover:bg-sidebar-hover hover:text-white',
-          isActive && 'bg-sidebar-active text-white',
+          'flex items-center gap-2.5 rounded-md px-1.5 py-2.5 text-sm text-white hover:bg-sidebar-hover',
+          isActive && 'border border-white px-3',
           collapsed && 'justify-center px-0',
         )
       }
@@ -196,7 +205,7 @@ function NavGroup({
       <button
         onClick={() => setOpen((v) => !v)}
         className={cn(
-          'flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm text-white/70 hover:bg-sidebar-hover hover:text-white',
+          'flex w-full items-center gap-2.5 rounded-md px-1.5 py-2.5 text-sm text-white hover:bg-sidebar-hover',
           collapsed && 'justify-center px-0',
         )}
       >

@@ -44,5 +44,6 @@ export type PaymentRow = {
   date: string
   type?: string
   plan?: string
+  note?: string
   donationId?: string
 }

@@ -14,7 +14,12 @@ export function ActionButtons({
   return (
     <div className="flex items-center justify-center gap-2 text-slate-500">
       {onView && (
-        <button type="button" onClick={onView} className="rounded p-1 text-violet-600 hover:bg-violet-50" title="View">
+        <button
+          type="button"
+          onClick={onView}
+          className="flex size-6 items-center justify-center rounded bg-[#F3E9FF] text-[#9747FF] hover:bg-[#e8d6ff]"
+          title="View"
+        >
           <Eye className="size-4" />
         </button>
       )}

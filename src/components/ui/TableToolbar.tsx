@@ -1,4 +1,5 @@
-import { Calendar, Filter, Search } from 'lucide-react'
+import type { SelectHTMLAttributes } from 'react'
+import { Calendar, ChevronDown, Filter, Search } from 'lucide-react'
 
 const COUNTRIES = [
   { value: '', label: 'Country' },
@@ -7,6 +8,20 @@ const COUNTRIES = [
   { value: 'GB', label: 'UK' },
   { value: 'IN', label: 'India' },
 ]
+
+function FilterSelect({
+  children,
+  ...props
+}: SelectHTMLAttributes<HTMLSelectElement>) {
+  return (
+    <label className="relative flex h-11 min-w-[183px] items-center rounded-md border border-black/12 bg-white px-4">
+      <select {...props} className="h-full w-full appearance-none bg-transparent pr-6 text-base text-black outline-none">
+        {children}
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-4 size-3 text-black" />
+    </label>
+  )
+}
 
 export function TableToolbar({
   search,
@@ -26,43 +41,58 @@ export function TableToolbar({
   onViewAll?: () => void
 }) {
   return (
-    <div className="mb-3 flex flex-wrap items-center justify-end gap-2">
-      <label className="flex h-9 w-[200px] items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm">
-        <Search className="size-4 text-slate-400" />
+    <div className="flex flex-wrap items-end gap-4">
+      <label className="flex h-11 min-w-[240px] flex-1 items-center gap-2.5 rounded-md border border-black/10 bg-white px-4">
+        <Search className="size-5 text-black/60" />
         <input
           value={search}
           onChange={(e) => onSearch(e.target.value)}
-          placeholder="Search"
-          className="w-full bg-transparent outline-none"
+          placeholder="Type to search..."
+          className="w-full bg-transparent text-xs text-black outline-none placeholder:text-black/60"
         />
       </label>
-      <button type="button" className="flex h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 text-sm">
-        <Filter className="size-4" /> Filter
-      </button>
-      {onCountry && (
-        <select
-          value={country}
-          onChange={(e) => onCountry(e.target.value)}
-          className="h-9 rounded-lg border border-slate-200 bg-white px-2 text-sm"
+      <div className="flex flex-wrap items-center gap-4">
+        <button
+          type="button"
+          className="flex h-11 min-w-[183px] items-center justify-between rounded-md border border-black/12 bg-white px-4 text-base text-black"
         >
-          {COUNTRIES.map((c) => (
-            <option key={c.value} value={c.value}>
-              {c.label}
-            </option>
-          ))}
-        </select>
-      )}
-      {onFrom && (
-        <label className="flex h-9 items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-sm text-slate-500">
-          <Calendar className="size-4" />
-          <input type="date" value={from} onChange={(e) => onFrom(e.target.value)} className="bg-transparent outline-none" />
-        </label>
-      )}
-      {onViewAll && (
-        <button type="button" onClick={onViewAll} className="h-9 rounded-lg bg-violet-600 px-3 text-sm font-medium text-white">
-          View All
+          <span className="inline-flex items-center gap-2.5">
+            <Filter className="size-3.5" />
+            Filter
+          </span>
+          <ChevronDown className="size-3" />
         </button>
-      )}
+        {onCountry && (
+          <FilterSelect value={country} onChange={(e) => onCountry(e.target.value)}>
+            {COUNTRIES.map((c) => (
+              <option key={c.value} value={c.value}>
+                {c.label}
+              </option>
+            ))}
+          </FilterSelect>
+        )}
+        {onFrom && (
+          <label className="relative flex h-11 min-w-[183px] items-center gap-2.5 rounded-md border border-black/12 bg-white px-4 text-base text-black">
+            <Calendar className="size-5 shrink-0" />
+            <input
+              type="date"
+              value={from}
+              onChange={(e) => onFrom(e.target.value)}
+              className="h-full w-full bg-transparent text-base outline-none"
+            />
+            <ChevronDown className="pointer-events-none size-3" />
+          </label>
+        )}
+        {onViewAll && (
+          <button
+            type="button"
+            onClick={onViewAll}
+            className="h-11 rounded-md bg-[#020B17] px-4 text-sm font-medium text-white"
+          >
+            View All
+          </button>
+        )}
+      </div>
     </div>
   )
 }

@@ -1,5 +1,9 @@
 import type { ReactNode } from 'react'
 
+export function TableFrame({ children }: { children: ReactNode }) {
+  return <div className="overflow-hidden rounded-lg border border-black/12 bg-white">{children}</div>
+}
+
 export function DataTable({
   columns,
   children,
@@ -9,17 +13,20 @@ export function DataTable({
 }) {
   return (
     <div className="overflow-x-auto">
-      <table className="min-w-full text-left text-sm">
-        <thead className="border-b border-slate-100 text-xs font-semibold uppercase tracking-wide text-slate-500">
-          <tr>
+      <table className="min-w-full text-center text-xs tracking-[0.112px]">
+        <thead>
+          <tr className="border-b border-[#E7E7E7]">
             {columns.map((c) => (
-              <th key={c} className="whitespace-nowrap px-3 py-3">
+              <th
+                key={c}
+                className="whitespace-nowrap bg-[#020B17] px-2.5 py-4 font-normal text-white"
+              >
                 {c}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody className="divide-y divide-slate-100">{children}</tbody>
+        <tbody className="[&>tr:nth-child(even)]:bg-[rgba(2,11,23,0.06)]">{children}</tbody>
       </table>
     </div>
   )
