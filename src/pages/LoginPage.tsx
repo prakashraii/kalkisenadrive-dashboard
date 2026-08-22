@@ -15,8 +15,8 @@ export function LoginPage() {
     <div className="flex min-h-screen">
       <div className="hidden w-[420px] flex-col justify-between bg-sidebar p-10 text-white md:flex">
         <div>
-          <img src="/logo.svg" alt="Kalki Sena Drive" className="h-16 w-16 rounded-full object-cover" />
-          <h1 className="mt-6 text-2xl font-bold">KALKI SENA DRIVE</h1>
+          <img src="/kalki-sena-logo.png" alt="Kalki Sena Drive" className="w-full object-contain" />
+          <h1 className="sr-only">KALKI SENA DRIVE</h1>
           <p className="mt-2 text-white/70">Donations, memberships, clinic, books, and driver registrations.</p>
         </div>
         <p className="text-xs text-white/40">Admin dashboard</p>

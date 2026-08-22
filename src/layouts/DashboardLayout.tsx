@@ -75,12 +75,32 @@ export function DashboardLayout() {
     enabled: !!admin,
   })
 
-  const formMode = new URLSearchParams(location.search).get('form')
-  const formTitle = formMode === 'new' ? 'Add User' : formMode === 'edit' ? 'User Details' : null
-  const title = formTitle ?? titles[location.pathname] ?? 'Dashboard'
+  const params = new URLSearchParams(location.search)
+  const formMode = params.get('form')
+  const formTitle = formMode === 'new' ? 'Add User' : formMode === 'edit' || formMode === 'view' ? 'User Details' : null
+  const donationTabLabels: Record<string, string> = {
+    all: 'Donation',
+    dowry: 'Dowry Donation',
+    doctor: 'Doctor Donation',
+    general: 'General Donation',
+  }
+  const donationTabLabel = donationTabLabels[params.get('tab') ?? 'all'] ?? 'Donation'
+  const donationView = location.pathname === '/donations' && params.get('view')
+  const donationTitle = location.pathname === '/donations' ? (donationView ? 'User Details' : donationTabLabel) : null
+  const membershipView = location.pathname === '/memberships' && params.get('view')
+  const membershipTitle = membershipView ? 'Member Details' : null
+  const title = formTitle ?? donationTitle ?? membershipTitle ?? titles[location.pathname] ?? 'Dashboard'
   const crumb = formTitle ? (
     <>
       Menu / User List / <span className="text-[#7EB6FF]">{formTitle}</span>
+    </>
+  ) : donationView ? (
+    <>
+      Menu / {donationTabLabel} User List / <span className="text-[#7EB6FF]">User Details</span>
+    </>
+  ) : membershipView ? (
+    <>
+      Menu / Membership / <span className="text-[#7EB6FF]">Member Details</span>
     </>
   ) : (
     `Menu / ${title}`
@@ -95,14 +115,12 @@ export function DashboardLayout() {
   return (
     <div className="flex min-h-screen bg-page">
       <aside className={cn('flex h-screen flex-col bg-sidebar text-white transition-all', collapsed ? 'w-[76px]' : 'w-[198px]')}>
-        <div className="flex h-[65px] items-center justify-center gap-2 px-3">
-          <img src="/logo.svg" alt="Kalki Sena Drive" className="h-12 w-12 rounded-full object-cover" />
-          {!collapsed && (
-            <div className="leading-tight">
-              <p className="text-sm font-bold tracking-wide">KALKI SENA</p>
-              <p className="text-xs text-white/70">DRIVE.</p>
-            </div>
-          )}
+        <div className={cn('flex items-center justify-center px-3', collapsed ? 'h-[65px]' : 'py-3')}>
+          <img
+            src="/kalki-sena-logo.png"
+            alt="Kalki Sena Drive"
+            className={cn('object-contain', collapsed ? 'h-10 w-10' : 'h-auto w-full')}
+          />
         </div>
         <nav className="flex-1 space-y-4 overflow-y-auto px-3 py-4">
           {nav.map((item) =>

@@ -1,13 +1,22 @@
-import type { ChangeEventHandler, ReactNode } from 'react'
+import { useState, type ChangeEventHandler, type ReactNode } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Formik } from 'formik'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Search } from 'lucide-react'
 import * as Yup from 'yup'
-import { api } from '../../lib/api'
-import { cn } from '../../lib/cn'
+import { api, type Paginated, type PaymentRow } from '../../lib/api'
+import { cn, formatMoney } from '../../lib/cn'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
+import { Modal } from '../ui/Actions'
+import { DetailList } from '../ui/DetailList'
+import { Pagination } from '../ui/Pagination'
+import { PaymentTable } from '../ui/PaymentTable'
+import { TableFrame } from '../ui/DataTable'
+import { Tabs } from '../ui/Tabs'
 
 type User = {
   id: string
+  publicId?: string
+  memberCode?: string
   name: string
   email?: string | null
   phone: string
@@ -16,6 +25,35 @@ type User = {
   status: string
 }
 
+type DriverReg = {
+  id: string
+  licenseNumber: string
+  vehicleType: string
+  vehicleNumber: string
+  status: string
+}
+
+type Membership = {
+  id: string
+  startedAt: string
+  expiresAt: string
+  status: string
+  plan: { name: string; code: string; priceCents: number; durationMonths: number }
+}
+
+type UserDetails = User & {
+  driverRegistrations?: DriverReg[]
+  memberships?: Membership[]
+}
+
+type DetailsTab = 'personal' | 'payments' | 'membership'
+
+const DETAILS_TABS: { id: DetailsTab; label: string }[] = [
+  { id: 'personal', label: 'Personal Info' },
+  { id: 'payments', label: 'Payment History' },
+  { id: 'membership', label: 'Membership Details' },
+]
+
 const schema = Yup.object({
   name: Yup.string().required('Required'),
   phone: Yup.string().matches(/^[0-9]{10}$/, '10-digit phone').required('Required'),
@@ -23,25 +61,39 @@ const schema = Yup.object({
   city: Yup.string(),
   countryCode: Yup.string().required(),
   status: Yup.string().required(),
+  vehicleType: Yup.string(),
+  licenseNumber: Yup.string(),
+  vehicleNumber: Yup.string(),
 })
 
 const fieldClass =
   'h-11 w-full rounded-lg bg-[#E5E5E5] px-4 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
 
+const textareaClass =
+  'min-h-[168px] w-full resize-none rounded-lg bg-[#E5E5E5] px-4 py-3 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
+
 function FilledSelect({
   name,
   value,
   onChange,
+  disabled,
   children,
 }: {
   name: string
   value: string
-  onChange: ChangeEventHandler<HTMLSelectElement>
+  onChange?: ChangeEventHandler<HTMLSelectElement>
+  disabled?: boolean
   children: ReactNode
 }) {
   return (
     <div className="relative">
-      <select name={name} value={value} onChange={onChange} className={cn(fieldClass, 'appearance-none pr-10')}>
+      <select
+        name={name}
+        value={value}
+        onChange={onChange}
+        disabled={disabled}
+        className={cn(fieldClass, 'appearance-none pr-10 disabled:opacity-80')}
+      >
         {children}
       </select>
       <ChevronDown className="pointer-events-none absolute right-4 top-1/2 size-4 -translate-y-1/2 text-[#262626]" />
@@ -49,110 +101,337 @@ function FilledSelect({
   )
 }
 
+function formatDate(value?: string) {
+  if (!value) return ''
+  return new Date(value).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
 export function UserDetailsForm({
   edit,
   onClose,
+  readOnly = false,
 }: {
   edit: User | 'new'
   onClose: () => void
+  readOnly?: boolean
 }) {
-  const mut = useAdminMutation(['users', 'dashboard-summary'])
+  const mut = useAdminMutation(['users', 'drivers', 'dashboard-summary'])
   const isNew = edit === 'new'
+  const userId = isNew ? '' : edit.id
+  const [tab, setTab] = useState<DetailsTab>('personal')
+  const [payPage, setPayPage] = useState(1)
+  const [paySearch, setPaySearch] = useState('')
+  const [payMethod, setPayMethod] = useState<'WALLET' | 'BANK' | ''>('WALLET')
+  const [viewPay, setViewPay] = useState<PaymentRow | null>(null)
+
+  const { data: details } = useQuery({
+    queryKey: ['user-details', userId],
+    queryFn: async () => (await api.get<UserDetails>(`/admin/users/${userId}`)).data,
+    enabled: !!userId,
+  })
+
+  const payments = useQuery({
+    queryKey: ['user-payments', userId, payPage, paySearch, payMethod],
+    queryFn: async () =>
+      (
+        await api.get<Paginated<PaymentRow>>('/admin/payments', {
+          params: {
+            userId,
+            page: payPage,
+            limit: 10,
+            search: paySearch || undefined,
+            method: payMethod || undefined,
+          },
+        })
+      ).data,
+    enabled: !!userId && tab === 'payments',
+  })
+
+  const driver = details?.driverRegistrations?.[0]
+  const membership = details?.memberships?.[0]
+  const memberCode = details?.memberCode ?? (!isNew ? edit.memberCode : '') ?? ''
+  const isDriver = Boolean(driver)
+
+  const initialValues = isNew
+    ? {
+        name: '',
+        phone: '',
+        email: '',
+        city: '',
+        countryCode: 'NP',
+        status: 'ACTIVE',
+        memberCode: '',
+        vehicleType: '',
+        licenseNumber: '',
+        vehicleNumber: '',
+      }
+    : {
+        name: details?.name ?? edit.name,
+        phone: details?.phone ?? edit.phone,
+        email: details?.email ?? edit.email ?? '',
+        city: details?.city ?? edit.city ?? '',
+        countryCode: details?.countryCode ?? edit.countryCode,
+        status: details?.status ?? edit.status,
+        memberCode,
+        vehicleType: driver?.vehicleType ?? '',
+        licenseNumber: driver?.licenseNumber ?? '',
+        vehicleNumber: driver?.vehicleNumber ?? '',
+      }
 
   return (
     <div className="-mx-8 -my-8 min-h-full bg-white px-8 py-8">
+      {(isDriver || memberCode) && (
+        <div className="mb-4 flex flex-wrap items-center gap-4 text-sm">
+          {isDriver && <p className="text-[#009EE8]">(Registered Driver)</p>}
+          {memberCode && <p className="text-black/60">Member ID: {memberCode}</p>}
+        </div>
+      )}
       <div className="mb-8">
-        <span className="inline-flex h-14 items-center rounded-md bg-[#020B17] px-8 text-base text-white">Personal Info</span>
+        <Tabs tabs={DETAILS_TABS} value={tab} onChange={setTab} />
       </div>
-      <Formik
-        initialValues={
-          isNew
-            ? { name: '', phone: '', email: '', city: '', countryCode: 'NP', status: 'ACTIVE' }
-            : {
-                name: edit.name,
-                phone: edit.phone,
-                email: edit.email ?? '',
-                city: edit.city ?? '',
-                countryCode: edit.countryCode,
-                status: edit.status,
+
+      {tab === 'personal' && (
+        <Formik
+          enableReinitialize
+          initialValues={initialValues}
+          validationSchema={schema}
+          onSubmit={async (values) => {
+            if (readOnly) return
+            const payload = {
+              name: values.name,
+              phone: values.phone,
+              email: values.email || undefined,
+              city: values.city,
+              countryCode: values.countryCode,
+              status: values.status,
+            }
+            if (isNew) await mut.mutateAsync(() => api.post('/admin/users', payload))
+            else {
+              await mut.mutateAsync(() => api.patch(`/admin/users/${edit.id}`, payload))
+              if (driver) {
+                await mut.mutateAsync(() =>
+                  api.patch(`/admin/drivers/${driver.id}`, {
+                    name: values.name,
+                    phone: values.phone,
+                    email: values.email || undefined,
+                    city: values.city,
+                    countryCode: values.countryCode,
+                    licenseNumber: values.licenseNumber,
+                    vehicleType: values.vehicleType,
+                    vehicleNumber: values.vehicleNumber,
+                  }),
+                )
               }
-        }
-        validationSchema={schema}
-        onSubmit={async (values) => {
-          if (isNew) await mut.mutateAsync(() => api.post('/admin/users', values))
-          else await mut.mutateAsync(() => api.patch(`/admin/users/${edit.id}`, values))
-          onClose()
-        }}
-      >
-        {(fk) => (
-          <form onSubmit={fk.handleSubmit} className="grid max-w-5xl grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2">
-            <div>
+            }
+            onClose()
+          }}
+        >
+          {(fk) => (
+            <form onSubmit={fk.handleSubmit} className="grid max-w-5xl grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2">
+              <div>
+                <input
+                  name="name"
+                  value={fk.values.name}
+                  onChange={fk.handleChange}
+                  readOnly={readOnly}
+                  placeholder="User Name"
+                  className={fieldClass}
+                />
+                {fk.touched.name && fk.errors.name && <p className="mt-1 text-xs text-rose-600">{fk.errors.name}</p>}
+              </div>
+              <div>
+                <input
+                  name="phone"
+                  value={fk.values.phone}
+                  onChange={fk.handleChange}
+                  readOnly={readOnly}
+                  placeholder="Phone"
+                  className={fieldClass}
+                />
+                {fk.touched.phone && fk.errors.phone && <p className="mt-1 text-xs text-rose-600">{fk.errors.phone}</p>}
+              </div>
+              <FilledSelect name="countryCode" value={fk.values.countryCode} onChange={fk.handleChange} disabled={readOnly}>
+                <option value="NP">Nepal</option>
+                <option value="US">USA</option>
+                <option value="GB">UK</option>
+                <option value="IN">India</option>
+              </FilledSelect>
+              <FilledSelect name="vehicleType" value={fk.values.vehicleType} onChange={fk.handleChange} disabled={readOnly}>
+                <option value="">Vehicle Type</option>
+                <option value="Bike">Bike</option>
+                <option value="Car">Car</option>
+                <option value="Scooter">Scooter</option>
+              </FilledSelect>
+              <div>
+                <input
+                  name="email"
+                  value={fk.values.email}
+                  onChange={fk.handleChange}
+                  readOnly={readOnly}
+                  placeholder="Email"
+                  className={fieldClass}
+                />
+                {fk.touched.email && fk.errors.email && <p className="mt-1 text-xs text-rose-600">{fk.errors.email}</p>}
+              </div>
               <input
-                name="name"
-                value={fk.values.name}
+                name="licenseNumber"
+                value={fk.values.licenseNumber}
                 onChange={fk.handleChange}
-                placeholder="Full name"
+                readOnly={readOnly}
+                placeholder="License Number"
                 className={fieldClass}
               />
-              {fk.touched.name && fk.errors.name && <p className="mt-1 text-xs text-rose-600">{fk.errors.name}</p>}
-            </div>
-            <div>
               <input
-                name="phone"
-                value={fk.values.phone}
+                name="vehicleNumber"
+                value={fk.values.vehicleNumber}
                 onChange={fk.handleChange}
-                placeholder="Phone"
-                className={fieldClass}
+                readOnly={readOnly}
+                placeholder="Vehicle Number"
+                className={`${fieldClass} md:col-span-2`}
               />
-              {fk.touched.phone && fk.errors.phone && <p className="mt-1 text-xs text-rose-600">{fk.errors.phone}</p>}
-            </div>
-            <FilledSelect name="countryCode" value={fk.values.countryCode} onChange={fk.handleChange}>
-              <option value="NP">Nepal</option>
-              <option value="US">USA</option>
-              <option value="GB">UK</option>
-              <option value="IN">India</option>
-            </FilledSelect>
-            <FilledSelect name="status" value={fk.values.status} onChange={fk.handleChange}>
-              <option value="ACTIVE">Active</option>
-              <option value="INACTIVE">Inactive</option>
-              <option value="SUSPENDED">Suspended</option>
-            </FilledSelect>
-            <div>
-              <input
-                name="email"
-                value={fk.values.email}
-                onChange={fk.handleChange}
-                placeholder="Email"
-                className={fieldClass}
-              />
-              {fk.touched.email && fk.errors.email && <p className="mt-1 text-xs text-rose-600">{fk.errors.email}</p>}
-            </div>
+              <FilledSelect name="city" value={fk.values.city} onChange={fk.handleChange} disabled={readOnly}>
+                <option value="">City</option>
+                {['Kathmandu', 'Lalitpur', 'Bhaktapur', 'Pokhara', 'London', fk.values.city]
+                  .filter((city, i, all) => city && all.indexOf(city) === i)
+                  .map((city) => (
+                    <option key={city} value={city}>
+                      {city}
+                    </option>
+                  ))}
+              </FilledSelect>
+              <FilledSelect name="status" value={fk.values.status} onChange={fk.handleChange} disabled={readOnly}>
+                <option value="ACTIVE">Active</option>
+                <option value="INACTIVE">Inactive</option>
+                <option value="SUSPENDED">Suspended</option>
+              </FilledSelect>
+              <div className="flex justify-end gap-3 md:col-span-2">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="h-11 rounded-md border border-black/12 px-6 text-sm text-black"
+                >
+                  {readOnly ? 'Back' : 'Cancel'}
+                </button>
+                {!readOnly && (
+                  <button
+                    type="submit"
+                    disabled={fk.isSubmitting}
+                    className="h-11 rounded-md bg-accent px-6 text-sm font-medium text-black disabled:opacity-60"
+                  >
+                    {fk.isSubmitting ? 'Saving…' : 'Save'}
+                  </button>
+                )}
+              </div>
+            </form>
+          )}
+        </Formik>
+      )}
+
+      {tab === 'payments' && (
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={() => {
+                setPayMethod('WALLET')
+                setPayPage(1)
+              }}
+              className={cn(
+                'h-11 rounded-md px-6 text-sm',
+                payMethod === 'WALLET' ? 'bg-[#020B17] text-white' : 'border border-black/12 bg-white text-black',
+              )}
+            >
+              Wallet
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setPayMethod('BANK')
+                setPayPage(1)
+              }}
+              className={cn(
+                'h-11 rounded-md px-6 text-sm',
+                payMethod === 'BANK' ? 'bg-[#020B17] text-white' : 'border border-black/12 bg-white text-black',
+              )}
+            >
+              Bank
+            </button>
+          </div>
+          <label className="flex h-11 max-w-md items-center gap-2.5 rounded-md border border-black/10 bg-white px-4">
+            <Search className="size-5 text-black/60" />
             <input
-              name="city"
-              value={fk.values.city}
-              onChange={fk.handleChange}
-              placeholder="City"
+              value={paySearch}
+              onChange={(e) => {
+                setPaySearch(e.target.value)
+                setPayPage(1)
+              }}
+              placeholder="Type to search..."
+              className="w-full bg-transparent text-xs text-black outline-none placeholder:text-black/60"
+            />
+          </label>
+          <TableFrame>
+            <PaymentTable
+              rows={payments.data?.data ?? []}
+              onView={setViewPay}
+              nameHeader="Buyer Name"
+            />
+            <Pagination
+              page={payments.data?.meta.page ?? 1}
+              pageCount={payments.data?.meta.pageCount ?? 1}
+              total={payments.data?.meta.total ?? 0}
+              limit={10}
+              onPage={setPayPage}
+            />
+          </TableFrame>
+        </div>
+      )}
+
+      {tab === 'membership' && (
+        <div className="grid max-w-5xl grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2">
+          <div className="flex flex-col gap-8">
+            <input readOnly value={membership?.plan.name ?? ''} placeholder="Plan Name" className={fieldClass} />
+            <input readOnly value={formatDate(membership?.startedAt)} placeholder="Start Date" className={fieldClass} />
+            <input readOnly value={formatDate(membership?.expiresAt)} placeholder="Expiry Date" className={fieldClass} />
+            <input
+              readOnly
+              value={membership?.status ? membership.status.replaceAll('_', ' ') : ''}
+              placeholder="Status"
               className={fieldClass}
             />
-            <div className="flex justify-end gap-3 md:col-span-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="h-11 rounded-md border border-black/12 px-6 text-sm text-black"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={fk.isSubmitting}
-                className="h-11 rounded-md bg-accent px-6 text-sm font-medium text-black disabled:opacity-60"
-              >
-                {fk.isSubmitting ? 'Saving…' : 'Save'}
-              </button>
-            </div>
-          </form>
+          </div>
+          <div className="flex flex-col gap-8">
+            <input
+              readOnly
+              value={membership ? `${formatMoney(membership.plan.priceCents).replace('रू ', '')}/-` : ''}
+              placeholder="Amount"
+              className={fieldClass}
+            />
+            <textarea
+              readOnly
+              value={
+                membership
+                  ? `${membership.plan.code} · ${membership.plan.durationMonths} months`
+                  : ''
+              }
+              placeholder="Membership Details"
+              className={textareaClass}
+            />
+          </div>
+        </div>
+      )}
+
+      <Modal title="Payment" open={!!viewPay} onClose={() => setViewPay(null)}>
+        {viewPay && (
+          <DetailList
+            items={[
+              { label: 'Buyer', value: viewPay.userName },
+              { label: 'Amount', value: String(viewPay.amountCents / 100) },
+              { label: 'Trans. ID', value: viewPay.transId },
+              { label: 'Status', value: viewPay.status },
+            ]}
+          />
         )}
-      </Formik>
+      </Modal>
     </div>
   )
 }

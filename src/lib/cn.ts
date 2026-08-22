@@ -14,14 +14,23 @@ export function formatNumber(value: number) {
   return new Intl.NumberFormat('en-NP').format(value)
 }
 
-export function formatDateTime(value: string | Date) {
-  return new Date(value).toLocaleString('en-GB', {
+export function formatDate(value: string | Date) {
+  return new Date(value).toLocaleDateString('en-GB', {
     day: '2-digit',
     month: 'short',
     year: 'numeric',
+  })
+}
+
+export function formatTime(value: string | Date) {
+  return new Date(value).toLocaleTimeString('en-GB', {
     hour: 'numeric',
     minute: '2-digit',
   })
+}
+
+export function formatDateTime(value: string | Date) {
+  return `${formatDate(value)}, ${formatTime(value)}`
 }
 
 export function flagEmoji(code?: string | null) {

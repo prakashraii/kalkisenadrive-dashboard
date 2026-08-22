@@ -34,23 +34,27 @@ type User = {
 type Driver = {
   id: string
   publicId: string
+  userId?: string | null
   name: string
   phone: string
   licenseNumber: string
   vehicleType: string
   vehicleNumber: string
   city?: string | null
+  countryCode?: string
   status: string
 }
 
 type Order = {
   id: string
   publicId: string
+  userId?: string
   userName: string
   transId: string
   amountCents: number
   method: string
   city?: string | null
+  countryCode?: string
   status: string
   items: { titleSnapshot: string; qty: number }[]
 }
@@ -74,16 +78,41 @@ export function UsersPage() {
   const list = useAdminList(tab, path)
   const mut = useAdminMutation(['users', 'donations', 'members', 'drivers', 'book-orders', 'dashboard-summary'])
   const [edit, setEdit] = useState<User | 'new' | null>(null)
+  const [formMode, setFormMode] = useState<'new' | 'edit' | 'view'>('edit')
   const [del, setDel] = useState<User | null>(null)
-  const [view, setView] = useState<PaymentRow | Driver | Order | User | null>(null)
+  const [view, setView] = useState<PaymentRow | Driver | Order | null>(null)
 
-  function openForm(next: User | 'new') {
+  function openForm(next: User | 'new', mode: 'new' | 'edit' | 'view' = next === 'new' ? 'new' : 'edit') {
     setEdit(next)
-    navigate(next === 'new' ? '/users?form=new' : '/users?form=edit')
+    setFormMode(mode)
+    navigate(mode === 'new' ? '/users?form=new' : `/users?form=${mode}`)
+  }
+
+  function openUserView(user: User) {
+    openForm(user, 'view')
+  }
+
+  function openPaymentUser(row: PaymentRow) {
+    if (!row.userId) {
+      setView(row)
+      return
+    }
+    openUserView({
+      id: row.userId,
+      publicId: row.publicId,
+      memberCode: row.memberId,
+      name: row.userName,
+      email: row.email,
+      phone: row.phone,
+      countryCode: row.countryCode,
+      city: row.city,
+      status: row.status,
+    })
   }
 
   function closeForm() {
     setEdit(null)
+    setFormMode('edit')
     navigate('/users')
   }
 
@@ -112,7 +141,7 @@ export function UsersPage() {
   const paymentTabs = tab === 'donations' || tab === 'members'
 
   if (edit) {
-    return <UserDetailsForm edit={edit} onClose={closeForm} />
+    return <UserDetailsForm edit={edit} onClose={closeForm} readOnly={formMode === 'view'} />
   }
 
   return (
@@ -191,13 +220,13 @@ export function UsersPage() {
                     <StatusBadge status={u.status} />
                   </td>
                   <td className="px-2.5 py-4">
-                    <ActionButtons onView={() => setView(u)} onEdit={() => openForm(u)} onDelete={() => setDel(u)} />
+                    <ActionButtons onView={() => openUserView(u)} onEdit={() => openForm(u, 'edit')} onDelete={() => setDel(u)} />
                   </td>
                 </tr>
               ))}
             </DataTable>
           )}
-          {paymentTabs && <PaymentTable rows={(list.data?.data ?? []) as PaymentRow[]} onView={setView} />}
+          {paymentTabs && <PaymentTable rows={(list.data?.data ?? []) as PaymentRow[]} onView={openPaymentUser} />}
           {tab === 'drivers' && (
             <DataTable columns={DRIVER_COLUMNS}>
               {((list.data?.data ?? []) as Driver[]).map((d) => (
@@ -214,7 +243,22 @@ export function UsersPage() {
                     <StatusBadge status={d.status} />
                   </td>
                   <td className="px-2.5 py-4">
-                    <ActionButtons onView={() => setView(d)} />
+                    <ActionButtons
+                      onView={() =>
+                        d.userId
+                          ? openUserView({
+                              id: d.userId,
+                              publicId: d.publicId,
+                              memberCode: '',
+                              name: d.name,
+                              phone: d.phone,
+                              countryCode: d.countryCode ?? 'NP',
+                              city: d.city,
+                              status: d.status,
+                            })
+                          : setView(d)
+                      }
+                    />
                   </td>
                 </tr>
               ))}
@@ -235,7 +279,22 @@ export function UsersPage() {
                     <StatusBadge status={o.status} />
                   </td>
                   <td className="px-2.5 py-4">
-                    <ActionButtons onView={() => setView(o)} />
+                    <ActionButtons
+                      onView={() =>
+                        o.userId
+                          ? openUserView({
+                              id: o.userId,
+                              publicId: o.publicId,
+                              memberCode: '',
+                              name: o.userName,
+                              phone: '',
+                              countryCode: o.countryCode ?? 'NP',
+                              city: o.city,
+                              status: o.status,
+                            })
+                          : setView(o)
+                      }
+                    />
                   </td>
                 </tr>
               ))}
@@ -257,16 +316,6 @@ export function UsersPage() {
             items={[
               { label: 'User', value: view.userName },
               { label: 'Amount', value: String((view as PaymentRow).amountCents / 100) },
-              { label: 'Status', value: view.status },
-            ]}
-          />
-        )}
-        {view && 'memberCode' in view && (
-          <DetailList
-            items={[
-              { label: 'Name', value: (view as User).name },
-              { label: 'Member ID', value: (view as User).memberCode },
-              { label: 'Phone', value: (view as User).phone },
               { label: 'Status', value: view.status },
             ]}
           />

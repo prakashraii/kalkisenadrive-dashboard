@@ -1,68 +1,105 @@
 import { useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { Formik } from 'formik'
 import * as Yup from 'yup'
 import { useQuery } from '@tanstack/react-query'
+import { Coins, UserPlus, Users } from 'lucide-react'
 import { api, type Paginated, type PaymentRow } from '../lib/api'
 import { useAdminList, useAdminMutation } from '../viewmodels/useAdminCrud'
-import { TableToolbar } from '../components/ui/TableToolbar'
+import { MemberDetailsForm } from '../components/memberships/MemberDetailsForm'
+import { MetricCard } from '../components/ui/MetricCard'
+import { Modal } from '../components/ui/Actions'
 import { Pagination } from '../components/ui/Pagination'
 import { PaymentTable } from '../components/ui/PaymentTable'
-import { Modal } from '../components/ui/Actions'
-import { DataTable } from '../components/ui/DataTable'
+import { TableFrame } from '../components/ui/DataTable'
+import { TableToolbar } from '../components/ui/TableToolbar'
 import { FormActions, FormField, SelectField, TextInput } from '../components/ui/FormField'
-import { formatMoney } from '../lib/cn'
 
 type Plan = { id: string; name: string; code: string; priceCents: number; durationMonths: number; isActive: boolean }
 
 export function MembershipsPage() {
+  const [params, setParams] = useSearchParams()
+  const viewId = params.get('view')
   const list = useAdminList<PaymentRow>('memberships', '/admin/memberships')
   const plans = useQuery({ queryKey: ['plans'], queryFn: async () => (await api.get<Plan[]>('/admin/membership-plans')).data })
-  const users = useQuery({ queryKey: ['users-mini'], queryFn: async () => (await api.get<Paginated<{ id: string; name: string }>>('/admin/users', { params: { limit: 50 } })).data })
-  const mut = useAdminMutation(['memberships', 'plans', 'dashboard-members'])
+  const users = useQuery({
+    queryKey: ['users-mini'],
+    queryFn: async () => (await api.get<Paginated<{ id: string; name: string }>>('/admin/users', { params: { limit: 50 } })).data,
+  })
+  const { data: stats } = useQuery({
+    queryKey: ['membership-stats'],
+    queryFn: async () =>
+      (await api.get<{ totalCents: number; memberCount: number; totalUsers: number }>('/admin/memberships/stats')).data,
+  })
+  const mut = useAdminMutation(['memberships', 'plans', 'dashboard-members', 'membership-stats'])
   const [create, setCreate] = useState(false)
   const [planOpen, setPlanOpen] = useState(false)
-  const [view, setView] = useState<PaymentRow | null>(null)
+
+  if (viewId) {
+    return <MemberDetailsForm membershipId={viewId} onClose={() => setParams({})} />
+  }
 
   return (
-    <div className="space-y-4">
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Membership plans</h2>
-          <button onClick={() => setPlanOpen(true)} className="h-9 rounded-lg border px-3 text-sm">
+    <div className="flex flex-col gap-8">
+      <div className="flex flex-wrap gap-4">
+        <MetricCard
+          title="Total Membership Amount"
+          value={stats?.totalCents ?? 0}
+          money
+          icon={<Coins className="size-6 text-[#FF543E]" />}
+        />
+        <MetricCard
+          title="Total Members"
+          value={stats?.memberCount ?? 0}
+          icon={<UserPlus className="size-6 text-[#009EE8]" />}
+        />
+        <MetricCard
+          title="Total Users"
+          value={stats?.totalUsers ?? 0}
+          icon={<Users className="size-6 text-[#00A419]" />}
+        />
+      </div>
+
+      <section className="flex flex-col gap-4">
+        <div className="flex flex-wrap items-center justify-end gap-3">
+          <button
+            type="button"
+            onClick={() => setPlanOpen(true)}
+            className="inline-flex h-11 items-center rounded-md border border-black/12 bg-white px-4 text-sm text-black"
+          >
             Add plan
           </button>
-        </div>
-        <DataTable columns={['Name', 'Code', 'Price', 'Months', 'Active']}>
-          {(plans.data ?? []).map((p) => (
-            <tr key={p.id}>
-              <td className="px-3 py-3">{p.name}</td>
-              <td className="px-3 py-3">{p.code}</td>
-              <td className="px-3 py-3">{formatMoney(p.priceCents)}</td>
-              <td className="px-3 py-3">{p.durationMonths}</td>
-              <td className="px-3 py-3">{p.isActive ? 'Yes' : 'No'}</td>
-            </tr>
-          ))}
-        </DataTable>
-      </div>
-      <div className="rounded-2xl bg-white p-4 shadow-sm">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Members</h2>
-          <button onClick={() => setCreate(true)} className="h-9 rounded-lg bg-violet-600 px-3 text-sm font-medium text-white">
+          <button
+            type="button"
+            onClick={() => setCreate(true)}
+            className="inline-flex h-11 items-center rounded-md bg-[#020B17] px-4 text-sm text-white"
+          >
             Add membership
           </button>
         </div>
-        <TableToolbar search={list.search} onSearch={list.setSearch} country={list.country} onCountry={list.setCountry} />
-        <PaymentTable rows={list.data?.data ?? []} onView={setView} />
-        <Pagination page={list.data?.meta.page ?? 1} pageCount={list.data?.meta.pageCount ?? 1} total={list.data?.meta.total ?? 0} limit={10} onPage={list.setPage} />
-      </div>
-
-      <Modal title="Member" open={!!view} onClose={() => setView(null)}>
-        {view && (
-          <p className="text-sm">
-            {view.userName} · {view.plan ?? '—'} · {formatMoney(view.amountCents)}
-          </p>
-        )}
-      </Modal>
+        <TableToolbar
+          search={list.search}
+          onSearch={list.setSearch}
+          country={list.country}
+          onCountry={list.setCountry}
+          from={list.from}
+          onFrom={list.setFrom}
+        />
+        <TableFrame>
+          <PaymentTable
+            membershipColumns
+            rows={list.data?.data ?? []}
+            onView={(row) => setParams({ view: row.id })}
+          />
+          <Pagination
+            page={list.data?.meta.page ?? 1}
+            pageCount={list.data?.meta.pageCount ?? 1}
+            total={list.data?.meta.total ?? 0}
+            limit={10}
+            onPage={list.setPage}
+          />
+        </TableFrame>
+      </section>
 
       <Modal title="Add membership" open={create} onClose={() => setCreate(false)}>
         <Formik
