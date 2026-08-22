@@ -1,0 +1,137 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-web-production
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    outputs:
+      image: ${{ steps.meta.outputs.image }}
+      sha_tag: ${{ steps.meta.outputs.sha_tag }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Image tags
+        id: meta
+        run: |
+          IMAGE="${REGISTRY}/${IMAGE_NAME,,}"
+          SHA_TAG="sha-${GITHUB_SHA::7}"
+          echo "image=${IMAGE}" >> "$GITHUB_OUTPUT"
+          echo "tags=${IMAGE}:latest,${IMAGE}:${SHA_TAG}" >> "$GITHUB_OUTPUT"
+          echo "sha_tag=${SHA_TAG}" >> "$GITHUB_OUTPUT"
+
+      - name: Resolve public build env
+        id: public_env
+        env:
+          VITE_API_URL: ${{ vars.VITE_API_URL }}
+        run: |
+          api="${VITE_API_URL:-https://kalkisenadriveapi.webstudiomatrix.com/api/v1}"
+          case "$api" in *localhost*|*127.0.0.1*)
+            echo "::error::VITE_API_URL must not be localhost"
+            exit 1
+            ;;
+          esac
+          echo "api_url=${api}" >> "$GITHUB_OUTPUT"
+          echo "Using VITE_API_URL=${api}"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            VITE_API_URL=${{ steps.public_env.outputs.api_url }}
+
+  deploy:
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+    env:
+      DEPLOY_PATH: ${{ secrets.DEPLOY_PATH_WEB || '/var/www/kalkisenadrive-dashboard' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup SSH Host kalki
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          DEPLOY_HOST: ${{ secrets.DEPLOY_HOST }}
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          chmod 700 ~/.ssh
+          KEY_FILE="$HOME/.ssh/deploy_key"
+          if printf '%s' "$DEPLOY_SSH_KEY" | grep -q "BEGIN .*PRIVATE KEY"; then
+            printf '%s\n' "$DEPLOY_SSH_KEY" | tr -d '\r' > "$KEY_FILE"
+          else
+            printf '%s' "$DEPLOY_SSH_KEY" | tr -d '\r\n\t ' | base64 -d > "$KEY_FILE"
+          fi
+          chmod 600 "$KEY_FILE"
+          ssh-keygen -y -f "$KEY_FILE" >/dev/null
+          ssh-keyscan -H "$DEPLOY_HOST" >> ~/.ssh/known_hosts
+          cat > ~/.ssh/config <<EOF
+          Host kalki
+            HostName ${DEPLOY_HOST}
+            User ${DEPLOY_USER}
+            IdentityFile ${KEY_FILE}
+            IdentitiesOnly yes
+            StrictHostKeyChecking accept-new
+          EOF
+          chmod 600 ~/.ssh/config
+
+      - name: Sync compose + deploy helpers
+        run: |
+          set -euo pipefail
+          : "${DEPLOY_PATH:?DEPLOY_PATH_WEB secret is empty}"
+          ssh kalki "mkdir -p '${DEPLOY_PATH}/deploy/nginx'"
+          rsync -az -e ssh ./docker-compose.yml "kalki:${DEPLOY_PATH}/"
+          rsync -az -e ssh ./deploy/remote-deploy.sh "kalki:${DEPLOY_PATH}/deploy/"
+          rsync -az -e ssh ./deploy/nginx/ "kalki:${DEPLOY_PATH}/deploy/nginx/"
+          ssh kalki "chmod +x '${DEPLOY_PATH}/deploy/remote-deploy.sh'"
+
+      - name: Ship image to VPS and restart
+        env:
+          IMAGE: ${{ needs.build-and-push.outputs.image }}
+          SHA_TAG: ${{ needs.build-and-push.outputs.sha_tag }}
+        run: |
+          set -euo pipefail
+          WEB_IMAGE="${IMAGE}:${SHA_TAG}"
+          echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+          docker pull "$WEB_IMAGE"
+          docker save "$WEB_IMAGE" | gzip -1 | ssh kalki "gunzip | docker load"
+          ssh kalki \
+            "DEPLOY_PATH='${DEPLOY_PATH}' \
+             WEB_IMAGE='${WEB_IMAGE}' \
+             SKIP_GHCR_PULL=1 \
+             bash -s" < ./deploy/remote-deploy.sh

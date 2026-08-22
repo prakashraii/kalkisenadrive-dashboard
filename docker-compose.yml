@@ -2,6 +2,7 @@ name: kalkisenadrive-dashboard
 
 services:
   web:
+    image: ${WEB_IMAGE:-ghcr.io/prakashraii/kalkisenadrive-dashboard:latest}
     build:
       context: .
       args:
@@ -9,4 +10,4 @@ services:
     container_name: kalkisena-dashboard
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${DASHBOARD_PORT:-3015}:80"
+      - "127.0.0.1:${WEB_HOST_PORT:-3015}:80"
