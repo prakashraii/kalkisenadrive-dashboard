@@ -28,6 +28,7 @@ export type Video = {
   thumbnailUrl?: string | null
   published: boolean
   sortOrder: number
+  createdAt?: string
 }
 
 function FilledSelect({

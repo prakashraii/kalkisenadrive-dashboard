@@ -50,7 +50,7 @@ const titles: Record<string, string> = {
   '/drivers': 'Drivers List',
   '/books': 'Books Sell',
   '/books/orders': 'Book Orders',
-  '/videos': 'Video',
+  '/videos': 'Video List',
   '/payments': 'Manage Accounts',
   '/notifications': 'Push Notification',
 }
@@ -101,7 +101,7 @@ export function DashboardLayout() {
   const bookTitle = location.pathname === '/books' ? (bookForm ? 'Add Book' : bookView ? 'Book Details' : 'Books Sell') : null
   const videoForm = location.pathname === '/videos' && (params.get('form') || params.get('view'))
   const videoUploadTitle = params.get('tab') === 'link' ? 'Upload Link' : 'Upload Video'
-  const videoTitle = location.pathname === '/videos' ? (videoForm ? videoUploadTitle : 'Video') : null
+  const videoTitle = location.pathname === '/videos' ? (videoForm ? videoUploadTitle : 'Video List') : null
   const paymentForm = location.pathname === '/payments' && params.get('form')
   const paymentView = location.pathname === '/payments' && params.get('view')
   const paymentWallet = params.get('type') === 'wallet'
@@ -156,6 +156,10 @@ export function DashboardLayout() {
   ) : paymentView ? (
     <>
       Menu / Manage Accounts / <span className="text-[#7EB6FF]">Payment Details</span>
+    </>
+  ) : location.pathname === '/videos' && !videoForm ? (
+    <>
+      Menu / <span className="text-[#7EB6FF]">Video List</span>
     </>
   ) : location.pathname === '/clinics' ? (
     'Menu / Clinics List'
