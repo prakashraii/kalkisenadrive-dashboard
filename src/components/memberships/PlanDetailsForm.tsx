@@ -22,16 +22,22 @@ export function PlanDetailsForm({ onClose }: { onClose: () => void }) {
         initialValues={{ name: '', code: '', price: 15000, durationMonths: 12 }}
         validationSchema={schema}
         onSubmit={async (values) => {
-          await mut.mutateAsync(() =>
-            api.post('/admin/membership-plans', {
-              name: values.name,
-              code: values.code,
-              priceCents: Math.round(Number(values.price) * 100),
-              durationMonths: Number(values.durationMonths),
-              isActive: true,
-            }),
-          )
-          onClose()
+          try {
+            await mut.run(
+              () =>
+                api.post('/admin/membership-plans', {
+                  name: values.name,
+                  code: values.code,
+                  priceCents: Math.round(Number(values.price) * 100),
+                  durationMonths: Number(values.durationMonths),
+                  isActive: true,
+                }),
+              { success: 'Plan created', error: 'Could not create plan' },
+            )
+            onClose()
+          } catch {
+            // Toast already shown
+          }
         }}
       >
         {(fk) => (

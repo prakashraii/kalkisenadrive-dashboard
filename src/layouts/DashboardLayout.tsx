@@ -19,6 +19,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { api } from '../lib/api'
 import { cn } from '../lib/cn'
+import { toast } from 'sonner'
 import { useAuth } from '../store/auth'
 
 const nav = [
@@ -227,8 +228,13 @@ export function DashboardLayout() {
   )
 
   async function logout() {
-    await api.post('/admin/auth/logout')
+    try {
+      await api.post('/admin/auth/logout')
+    } catch {
+      // Session is cleared locally either way.
+    }
     setAdmin(null)
+    toast.success('Signed out')
     navigate('/login')
   }
 

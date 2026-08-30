@@ -156,8 +156,15 @@ export function PaymentsPage() {
         onClose={() => setDelBank(null)}
         onConfirm={async () => {
           if (!delBank) return
-          await mut.mutateAsync(() => api.delete(`/admin/bank-accounts/${delBank.id}`))
-          setDelBank(null)
+          try {
+            await mut.run(() => api.delete(`/admin/bank-accounts/${delBank.id}`), {
+              success: 'Bank account deleted',
+              error: 'Could not delete bank account',
+            })
+            setDelBank(null)
+          } catch {
+            // Keep dialog open after a failed delete
+          }
         }}
       />
       <ConfirmDialog
@@ -167,8 +174,15 @@ export function PaymentsPage() {
         onClose={() => setDelWallet(null)}
         onConfirm={async () => {
           if (!delWallet) return
-          await mut.mutateAsync(() => api.delete(`/admin/wallet-accounts/${delWallet.id}`))
-          setDelWallet(null)
+          try {
+            await mut.run(() => api.delete(`/admin/wallet-accounts/${delWallet.id}`), {
+              success: 'Wallet deleted',
+              error: 'Could not delete wallet',
+            })
+            setDelWallet(null)
+          } catch {
+            // Keep dialog open after a failed delete
+          }
         }}
       />
     </div>

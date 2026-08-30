@@ -6,7 +6,9 @@ import { ChevronDown } from 'lucide-react'
 import * as Yup from 'yup'
 import { api } from '../../lib/api'
 import { assetUrl, cn } from '../../lib/cn'
+import { getApiMessage } from '../../lib/toast'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
+import { toast } from 'sonner'
 import { Tabs } from '../ui/Tabs'
 
 export type DriverDocumentKind =
@@ -163,6 +165,9 @@ function MediaSlot({
     try {
       await api.post(`/admin/drivers/${driverId}/documents/${kind}`, body)
       await qc.invalidateQueries({ queryKey: ['driver', driverId] })
+      toast.success('Document uploaded')
+    } catch (err) {
+      toast.error(getApiMessage(err, 'Could not upload document'))
     } finally {
       setBusy(false)
     }
@@ -260,14 +265,24 @@ export function DriverDetailsForm({
             vehicleYear: values.vehicleYear || undefined,
             insuranceNumber: values.insuranceNumber || undefined,
           }
-          if (isNew) {
-            const created = await mut.mutateAsync(() => api.post<DriverDetails>('/admin/drivers', payload))
-            const id = (created as { data?: DriverDetails }).data?.id
-            if (id) onCreated?.(id)
-            else onClose()
-            return
+          try {
+            if (isNew) {
+              const created = await mut.run(() => api.post<DriverDetails>('/admin/drivers', payload), {
+                success: 'Driver created',
+                error: 'Could not create driver',
+              })
+              const id = (created as { data?: DriverDetails }).data?.id
+              if (id) onCreated?.(id)
+              else onClose()
+              return
+            }
+            await mut.run(() => api.patch(`/admin/drivers/${driverId}`, payload), {
+              success: 'Driver updated',
+              error: 'Could not update driver',
+            })
+          } catch {
+            // Toast already shown
           }
-          await mut.mutateAsync(() => api.patch(`/admin/drivers/${driverId}`, payload))
         }}
       >
         {(fk) => (
@@ -425,14 +440,28 @@ export function DriverDetailsForm({
                   <>
                     <button
                       type="button"
-                      onClick={() => mut.mutateAsync(() => api.patch(`/admin/drivers/${driverId}/reject`))}
+                      onClick={() =>
+                        void mut
+                          .run(() => api.patch(`/admin/drivers/${driverId}/reject`), {
+                            success: 'Driver rejected',
+                            error: 'Could not reject driver',
+                          })
+                          .catch(() => undefined)
+                      }
                       className="h-11 rounded-md border border-rose-200 px-6 text-sm text-rose-600"
                     >
                       Reject
                     </button>
                     <button
                       type="button"
-                      onClick={() => mut.mutateAsync(() => api.patch(`/admin/drivers/${driverId}/approve`))}
+                      onClick={() =>
+                        void mut
+                          .run(() => api.patch(`/admin/drivers/${driverId}/approve`), {
+                            success: 'Driver approved',
+                            error: 'Could not approve driver',
+                          })
+                          .catch(() => undefined)
+                      }
                       className="h-11 rounded-md bg-emerald-600 px-6 text-sm text-white"
                     >
                       Approve

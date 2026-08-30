@@ -113,7 +113,13 @@ export function DonorDetailsForm({
               type="button"
               className="h-11 rounded-md border border-black/12 px-6 text-sm"
               onClick={() =>
-                mut.mutateAsync(() => api.patch(`/admin/donations/${row.donationId}/reject`)).then(onClose)
+                void mut
+                  .run(() => api.patch(`/admin/donations/${row.donationId}/reject`), {
+                    success: 'Donation rejected',
+                    error: 'Could not reject donation',
+                  })
+                  .then(onClose)
+                  .catch(() => undefined)
               }
             >
               Reject
@@ -122,7 +128,13 @@ export function DonorDetailsForm({
               type="button"
               className="h-11 rounded-md bg-emerald-600 px-6 text-sm text-white"
               onClick={() =>
-                mut.mutateAsync(() => api.patch(`/admin/donations/${row.donationId}/approve`)).then(onClose)
+                void mut
+                  .run(() => api.patch(`/admin/donations/${row.donationId}/approve`), {
+                    success: 'Donation approved',
+                    error: 'Could not approve donation',
+                  })
+                  .then(onClose)
+                  .catch(() => undefined)
               }
             >
               Approve

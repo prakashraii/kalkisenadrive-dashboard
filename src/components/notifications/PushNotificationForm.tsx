@@ -3,8 +3,10 @@ import { Formik } from 'formik'
 import { ChevronDown, History } from 'lucide-react'
 import { useEffect, useRef, useState, type ChangeEvent, type ChangeEventHandler, type DragEvent, type ReactNode } from 'react'
 import * as Yup from 'yup'
+import { toast } from 'sonner'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
+import { getApiMessage } from '../../lib/toast'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
 
 const fieldClass =
@@ -68,8 +70,6 @@ export function PushNotificationForm() {
   const mut = useAdminMutation(['push', 'admin-notifications'])
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState('')
-  const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
   const [showSchedule, setShowSchedule] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
   const modeRef = useRef<'send' | 'schedule'>('send')
@@ -99,14 +99,13 @@ export function PushNotificationForm() {
   function pickFile(next?: File | null) {
     if (!next) return
     if (!next.type.startsWith('image/')) {
-      setError('Choose a JPG, PNG or WebP image')
+      toast.error('Choose a JPG, PNG or WebP image')
       return
     }
     if (next.size > 5 * 1024 * 1024) {
-      setError('Image must be 5 MB or smaller')
+      toast.error('Image must be 5 MB or smaller')
       return
     }
-    setError('')
     setFile(next)
     setPreview((prev) => {
       if (prev) URL.revokeObjectURL(prev)
@@ -135,8 +134,6 @@ export function PushNotificationForm() {
       }}
       validationSchema={schema}
       onSubmit={async (values, helpers) => {
-        setError('')
-        setSuccess('')
         const sendNow = modeRef.current === 'send'
         const scheduledAt =
           !sendNow && values.scheduledAt ? new Date(values.scheduledAt).toISOString() : undefined
@@ -170,9 +167,9 @@ export function PushNotificationForm() {
           }
           if (sendNow && campaignId) {
             await mut.mutateAsync(() => api.post(`/admin/push-campaigns/${campaignId}/send`))
-            setSuccess('Notification sent')
+            toast.success('Notification sent')
           } else {
-            setSuccess('Notification scheduled')
+            toast.success('Notification scheduled')
           }
           helpers.resetForm()
           setFile(null)
@@ -182,11 +179,7 @@ export function PushNotificationForm() {
           })
           setShowSchedule(false)
         } catch (err) {
-          const message =
-            err && typeof err === 'object' && 'response' in err
-              ? (err as { response?: { data?: { message?: string | string[] } } }).response?.data?.message
-              : undefined
-          setError(Array.isArray(message) ? message.join(', ') : message || 'Could not save notification')
+          toast.error(getApiMessage(err, sendNow ? 'Could not send notification' : 'Could not schedule notification'))
         }
       }}
     >
@@ -210,10 +203,9 @@ export function PushNotificationForm() {
             return
           }
           if (!fk.values.scheduledAt) {
-            setError('Choose a date and time to schedule')
+            toast.error('Choose a date and time to schedule')
             return
           }
-          setError('')
           modeRef.current = 'schedule'
           await fk.submitForm()
         }
@@ -323,9 +315,6 @@ export function PushNotificationForm() {
                 </button>
               </div>
             </div>
-
-            {error && <p className="mt-4 text-sm text-rose-600">{error}</p>}
-            {success && <p className="mt-4 text-sm text-emerald-600">{success}</p>}
 
             <div className="mt-8 flex justify-end">
               <button

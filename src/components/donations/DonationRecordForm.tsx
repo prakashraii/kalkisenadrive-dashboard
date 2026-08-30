@@ -35,16 +35,22 @@ export function DonationRecordForm({
         initialValues={{ userId: '', type: defaultType, amount: 150, method: 'BANK', note: '' }}
         validationSchema={schema}
         onSubmit={async (values) => {
-          await mut.mutateAsync(() =>
-            api.post('/admin/donations', {
-              userId: values.userId,
-              type: values.type,
-              amountCents: Math.round(Number(values.amount) * 100),
-              method: values.method,
-              note: values.note || undefined,
-            }),
-          )
-          onClose()
+          try {
+            await mut.run(
+              () =>
+                api.post('/admin/donations', {
+                  userId: values.userId,
+                  type: values.type,
+                  amountCents: Math.round(Number(values.amount) * 100),
+                  method: values.method,
+                  note: values.note || undefined,
+                }),
+              { success: 'Donation recorded', error: 'Could not record donation' },
+            )
+            onClose()
+          } catch {
+            // Toast already shown
+          }
         }}
       >
         {(fk) => (

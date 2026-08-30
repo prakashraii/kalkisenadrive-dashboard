@@ -4,6 +4,7 @@ import { ChevronDown, Link2, Pencil, Video } from 'lucide-react'
 import { useEffect, useMemo, useRef, useState, type ChangeEvent, type ChangeEventHandler, type DragEvent, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import * as Yup from 'yup'
+import { toast } from 'sonner'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { isUploadedVideo, mediaUrl, youtubeEmbedUrl, youtubeVideoId } from '../../lib/media'
@@ -129,11 +130,15 @@ export function VideoDetailsForm({
   function pickFile(next?: File | null) {
     if (!next) return
     if (!next.type.startsWith('video/') && !/\.(mp4|webm|mov|m4v|mkv)$/i.test(next.name)) {
-      setError('Choose an MP4, WebM or MOV video file')
+      const message = 'Choose an MP4, WebM or MOV video file'
+      setError(message)
+      toast.error(message)
       return
     }
     if (next.size > 200 * 1024 * 1024) {
-      setError('Video must be 200 MB or smaller')
+      const message = 'Video must be 200 MB or smaller'
+      setError(message)
+      toast.error(message)
       return
     }
     setError('')
@@ -207,7 +212,9 @@ export function VideoDetailsForm({
           try {
             if (tab === 'video') {
               if (isNew && !file) {
-                setError('Choose a video file to upload')
+                const message = 'Choose a video file to upload'
+                setError(message)
+                toast.error(message)
                 return
               }
               if (file || isNew) {
@@ -218,18 +225,29 @@ export function VideoDetailsForm({
                 body.append('published', String(values.published))
                 body.append('sortOrder', String(values.sortOrder))
                 if (file) body.append('file', file)
-                if (isNew) await mut.mutateAsync(() => api.post('/admin/videos/upload', body))
-                else await mut.mutateAsync(() => api.post(`/admin/videos/${videoId}/upload`, body))
+                if (isNew) {
+                  await mut.run(() => api.post('/admin/videos/upload', body), {
+                    success: 'Video uploaded',
+                    error: 'Could not upload video',
+                  })
+                } else {
+                  await mut.run(() => api.post(`/admin/videos/${videoId}/upload`, body), {
+                    success: 'Video uploaded',
+                    error: 'Could not upload video',
+                  })
+                }
               } else {
-                await mut.mutateAsync(() =>
-                  api.patch(`/admin/videos/${videoId}`, {
-                    title: values.title,
-                    description: values.description || undefined,
-                    sourceUrl: values.sourceUrl,
-                    thumbnailUrl: values.thumbnailUrl || undefined,
-                    published: values.published,
-                    sortOrder: Number(values.sortOrder),
-                  }),
+                await mut.run(
+                  () =>
+                    api.patch(`/admin/videos/${videoId}`, {
+                      title: values.title,
+                      description: values.description || undefined,
+                      sourceUrl: values.sourceUrl,
+                      thumbnailUrl: values.thumbnailUrl || undefined,
+                      published: values.published,
+                      sortOrder: Number(values.sortOrder),
+                    }),
+                  { success: 'Video updated', error: 'Could not update video' },
                 )
               }
             } else {
@@ -241,16 +259,21 @@ export function VideoDetailsForm({
                 published: values.published,
                 sortOrder: Number(values.sortOrder),
               }
-              if (isNew) await mut.mutateAsync(() => api.post('/admin/videos', payload))
-              else await mut.mutateAsync(() => api.patch(`/admin/videos/${videoId}`, payload))
+              if (isNew) {
+                await mut.run(() => api.post('/admin/videos', payload), {
+                  success: 'Video added',
+                  error: 'Could not add video',
+                })
+              } else {
+                await mut.run(() => api.patch(`/admin/videos/${videoId}`, payload), {
+                  success: 'Video updated',
+                  error: 'Could not update video',
+                })
+              }
             }
             onClose()
-          } catch (err) {
-            const message =
-              err && typeof err === 'object' && 'response' in err
-                ? (err as { response?: { data?: { message?: string | string[] } } }).response?.data?.message
-                : undefined
-            setError(Array.isArray(message) ? message.join(', ') : message || 'Upload failed')
+          } catch {
+            // Toast already shown by mut.run
           }
         }}
       >

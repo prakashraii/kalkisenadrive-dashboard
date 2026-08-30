@@ -170,8 +170,15 @@ export function ClinicsPage() {
         pending={mut.isPending}
         onConfirm={async () => {
           if (!del) return
-          await mut.mutateAsync(() => api.delete(`/admin/clinics/${del.id}`))
-          setDel(null)
+          try {
+            await mut.run(() => api.delete(`/admin/clinics/${del.id}`), {
+              success: 'Clinic deleted',
+              error: 'Could not delete clinic',
+            })
+            setDel(null)
+          } catch {
+            // Keep dialog open after a failed delete
+          }
         }}
       />
     </div>

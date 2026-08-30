@@ -172,9 +172,22 @@ export function ClinicDetailsForm({
             mapUrl: values.mapUrl || undefined,
             status: values.status,
           }
-          if (isNew) await mut.mutateAsync(() => api.post('/admin/clinics', payload))
-          else await mut.mutateAsync(() => api.patch(`/admin/clinics/${clinicId}`, payload))
-          onClose()
+          try {
+            if (isNew) {
+              await mut.run(() => api.post('/admin/clinics', payload), {
+                success: 'Clinic created',
+                error: 'Could not create clinic',
+              })
+            } else {
+              await mut.run(() => api.patch(`/admin/clinics/${clinicId}`, payload), {
+                success: 'Clinic updated',
+                error: 'Could not update clinic',
+              })
+            }
+            onClose()
+          } catch {
+            // Toast already shown
+          }
         }}
       >
         {(fk) => (

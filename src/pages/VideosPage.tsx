@@ -116,8 +116,15 @@ export function VideosPage() {
         pending={mut.isPending}
         onConfirm={async () => {
           if (!del) return
-          await mut.mutateAsync(() => api.delete(`/admin/videos/${del.id}`))
-          setDel(null)
+          try {
+            await mut.run(() => api.delete(`/admin/videos/${del.id}`), {
+              success: 'Video deleted',
+              error: 'Could not delete video',
+            })
+            setDel(null)
+          } catch {
+            // Keep dialog open after a failed delete
+          }
         }}
       />
     </div>

@@ -142,9 +142,22 @@ export function PaymentSettingForm({
             notes: values.notes.trim() || undefined,
             qrUrl: values.qrUrl.trim() || undefined,
           }
-          if (isNew) await mut.mutateAsync(() => api.post('/admin/bank-accounts', payload))
-          else await mut.mutateAsync(() => api.patch(`/admin/bank-accounts/${bankId}`, payload))
-          onClose()
+          try {
+            if (isNew) {
+              await mut.run(() => api.post('/admin/bank-accounts', payload), {
+                success: 'Bank account added',
+                error: 'Could not add bank account',
+              })
+            } else {
+              await mut.run(() => api.patch(`/admin/bank-accounts/${bankId}`, payload), {
+                success: 'Bank account updated',
+                error: 'Could not update bank account',
+              })
+            }
+            onClose()
+          } catch {
+            // Toast already shown
+          }
         }}
       >
         {(fk) => (

@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Paginated } from '../lib/api'
+import { withToast } from '../lib/toast'
 
 export function useAdminList<T>(key: string, path: string, extra?: Record<string, string>) {
   const [page, setPage] = useState(1)
@@ -21,10 +22,16 @@ export function useAdminList<T>(key: string, path: string, extra?: Record<string
 
 export function useAdminMutation(invalidate: string[]) {
   const qc = useQueryClient()
-  return useMutation({
+  const mutation = useMutation({
     mutationFn: async (fn: () => Promise<unknown>) => fn(),
     onSuccess: () => {
       for (const k of invalidate) void qc.invalidateQueries({ queryKey: [k] })
     },
   })
+
+  function run<T>(fn: () => Promise<T>, messages: { success: string; error: string }) {
+    return withToast(() => mutation.mutateAsync(fn) as Promise<T>, messages)
+  }
+
+  return { ...mutation, run }
 }

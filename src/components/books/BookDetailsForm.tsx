@@ -199,9 +199,22 @@ export function BookDetailsForm({
             coverUrl: values.coverUrl || undefined,
             chapters,
           }
-          if (isNew) await mut.mutateAsync(() => api.post('/admin/books', payload))
-          else await mut.mutateAsync(() => api.patch(`/admin/books/${bookId}`, payload))
-          onClose()
+          try {
+            if (isNew) {
+              await mut.run(() => api.post('/admin/books', payload), {
+                success: 'Book created',
+                error: 'Could not create book',
+              })
+            } else {
+              await mut.run(() => api.patch(`/admin/books/${bookId}`, payload), {
+                success: 'Book updated',
+                error: 'Could not update book',
+              })
+            }
+            onClose()
+          } catch {
+            // Toast already shown
+          }
         }}
       >
         {(fk) => {

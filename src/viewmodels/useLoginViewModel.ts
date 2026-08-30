@@ -1,6 +1,8 @@
 import { useMutation } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 import { api } from '../lib/api'
+import { getApiMessage } from '../lib/toast'
 import { useAuth } from '../store/auth'
 
 export function useLoginViewModel() {
@@ -14,7 +16,11 @@ export function useLoginViewModel() {
     },
     onSuccess: (data) => {
       setAdmin(data.admin)
+      toast.success('Signed in')
       navigate('/')
+    },
+    onError: (err) => {
+      toast.error(getApiMessage(err, 'Invalid credentials'))
     },
   })
 

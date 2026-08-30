@@ -67,8 +67,12 @@ export function BookOrderDetailsForm({
     .join('\n')
 
   async function setStatus(status: OrderStatus) {
-    await mut.mutateAsync(() => api.patch(`/admin/book-orders/${orderId}`, { status }))
-    if (status === 'CANCELLED') onClose()
+    const cancelled = status === 'CANCELLED'
+    await mut.run(() => api.patch(`/admin/book-orders/${orderId}`, { status }), {
+      success: cancelled ? 'Order cancelled' : 'Order updated',
+      error: cancelled ? 'Could not cancel order' : 'Could not update order',
+    })
+    if (cancelled) onClose()
   }
 
   return (
@@ -119,7 +123,9 @@ export function BookOrderDetailsForm({
                 ? 'h-11 rounded-md border border-rose-200 px-6 text-sm text-rose-600 disabled:opacity-60'
                 : 'h-11 rounded-md border border-black/12 px-6 text-sm text-black disabled:opacity-60'
             }
-            onClick={() => (status === 'CANCELLED' ? setCancelOpen(true) : void setStatus(status))}
+            onClick={() =>
+              status === 'CANCELLED' ? setCancelOpen(true) : void setStatus(status).catch(() => undefined)
+            }
           >
             {statusLabel(status)}
           </button>
@@ -134,8 +140,12 @@ export function BookOrderDetailsForm({
         pending={mut.isPending}
         onClose={() => setCancelOpen(false)}
         onConfirm={async () => {
-          await setStatus('CANCELLED')
-          setCancelOpen(false)
+          try {
+            await setStatus('CANCELLED')
+            setCancelOpen(false)
+          } catch {
+            // Keep dialog open after a failed cancel
+          }
         }}
       />
     </div>

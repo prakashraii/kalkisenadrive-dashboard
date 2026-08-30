@@ -212,33 +212,44 @@ export function UserDetailsForm({
           validationSchema={schema}
           onSubmit={async (values) => {
             if (readOnly) return
-            const payload = {
-              name: values.name,
-              phone: values.phone,
-              email: values.email || undefined,
-              city: values.city,
-              countryCode: values.countryCode,
-              status: values.status,
-            }
-            if (isNew) await mut.mutateAsync(() => api.post('/admin/users', payload))
-            else {
-              await mut.mutateAsync(() => api.patch(`/admin/users/${edit.id}`, payload))
-              if (driver) {
-                await mut.mutateAsync(() =>
-                  api.patch(`/admin/drivers/${driver.id}`, {
-                    name: values.name,
-                    phone: values.phone,
-                    email: values.email || undefined,
-                    city: values.city,
-                    countryCode: values.countryCode,
-                    licenseNumber: values.licenseNumber,
-                    vehicleType: values.vehicleType,
-                    vehicleNumber: values.vehicleNumber,
-                  }),
+            try {
+              const payload = {
+                name: values.name,
+                phone: values.phone,
+                email: values.email || undefined,
+                city: values.city,
+                countryCode: values.countryCode,
+                status: values.status,
+              }
+              if (isNew) {
+                await mut.run(() => api.post('/admin/users', payload), {
+                  success: 'User created',
+                  error: 'Could not create user',
+                })
+              } else {
+                await mut.run(
+                  async () => {
+                    await api.patch(`/admin/users/${edit.id}`, payload)
+                    if (driver) {
+                      await api.patch(`/admin/drivers/${driver.id}`, {
+                        name: values.name,
+                        phone: values.phone,
+                        email: values.email || undefined,
+                        city: values.city,
+                        countryCode: values.countryCode,
+                        licenseNumber: values.licenseNumber,
+                        vehicleType: values.vehicleType,
+                        vehicleNumber: values.vehicleNumber,
+                      })
+                    }
+                  },
+                  { success: 'User updated', error: 'Could not update user' },
                 )
               }
+              onClose()
+            } catch {
+              // Toast already shown
             }
-            onClose()
           }}
         >
           {(fk) => (

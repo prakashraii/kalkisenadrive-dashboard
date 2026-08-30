@@ -33,8 +33,15 @@ export function MembershipCreateForm({ onClose }: { onClose: () => void }) {
         initialValues={{ userId: '', planId: '', method: 'BANK' }}
         validationSchema={schema}
         onSubmit={async (values) => {
-          await mut.mutateAsync(() => api.post('/admin/memberships', values))
-          onClose()
+          try {
+            await mut.run(() => api.post('/admin/memberships', values), {
+              success: 'Membership added',
+              error: 'Could not add membership',
+            })
+            onClose()
+          } catch {
+            // Toast already shown
+          }
         }}
       >
         {(fk) => (

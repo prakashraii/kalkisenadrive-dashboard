@@ -128,8 +128,15 @@ export function BooksPage() {
         pending={mut.isPending}
         onConfirm={async () => {
           if (!del) return
-          await mut.mutateAsync(() => api.delete(`/admin/books/${del.id}`))
-          setDel(null)
+          try {
+            await mut.run(() => api.delete(`/admin/books/${del.id}`), {
+              success: 'Book deleted',
+              error: 'Could not delete book',
+            })
+            setDel(null)
+          } catch {
+            // Keep dialog open after a failed delete
+          }
         }}
       />
     </div>

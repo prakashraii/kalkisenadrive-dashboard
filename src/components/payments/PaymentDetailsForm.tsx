@@ -79,14 +79,30 @@ export function PaymentDetailsForm({
             <button
               type="button"
               className="h-11 rounded-md border border-black/12 px-6 text-sm text-black"
-              onClick={() => mut.mutateAsync(() => api.patch(`/admin/payments/${row.id}/reject`)).then(onClose)}
+              onClick={() =>
+                void mut
+                  .run(() => api.patch(`/admin/payments/${row.id}/reject`), {
+                    success: 'Payment rejected',
+                    error: 'Could not reject payment',
+                  })
+                  .then(onClose)
+                  .catch(() => undefined)
+              }
             >
               Reject
             </button>
             <button
               type="button"
               className="h-11 rounded-md bg-[#001E5E] px-6 text-sm font-medium text-white"
-              onClick={() => mut.mutateAsync(() => api.patch(`/admin/payments/${row.id}/approve`)).then(onClose)}
+              onClick={() =>
+                void mut
+                  .run(() => api.patch(`/admin/payments/${row.id}/approve`), {
+                    success: 'Payment approved',
+                    error: 'Could not approve payment',
+                  })
+                  .then(onClose)
+                  .catch(() => undefined)
+              }
             >
               Approve
             </button>

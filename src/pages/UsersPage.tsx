@@ -319,8 +319,15 @@ export function UsersPage() {
         pending={mut.isPending}
         onConfirm={async () => {
           if (!del) return
-          await mut.mutateAsync(() => api.delete(`/admin/users/${del.id}`))
-          setDel(null)
+          try {
+            await mut.run(() => api.delete(`/admin/users/${del.id}`), {
+              success: 'User deleted',
+              error: 'Could not delete user',
+            })
+            setDel(null)
+          } catch {
+            // Keep dialog open after a failed delete
+          }
         }}
       />
     </div>

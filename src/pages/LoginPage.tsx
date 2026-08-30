@@ -32,6 +32,8 @@ export function LoginPage() {
           onSubmit={async (values, helpers) => {
             try {
               await vm.submit(values)
+            } catch {
+              // Toast already shown
             } finally {
               helpers.setSubmitting(false)
             }

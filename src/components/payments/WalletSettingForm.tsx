@@ -57,9 +57,22 @@ export function WalletSettingForm({
             details: values.details.trim(),
             isDefault: wallet?.isDefault ?? isNew,
           }
-          if (isNew) await mut.mutateAsync(() => api.post('/admin/wallet-accounts', payload))
-          else await mut.mutateAsync(() => api.patch(`/admin/wallet-accounts/${walletId}`, payload))
-          onClose()
+          try {
+            if (isNew) {
+              await mut.run(() => api.post('/admin/wallet-accounts', payload), {
+                success: 'Wallet added',
+                error: 'Could not add wallet',
+              })
+            } else {
+              await mut.run(() => api.patch(`/admin/wallet-accounts/${walletId}`, payload), {
+                success: 'Wallet updated',
+                error: 'Could not update wallet',
+              })
+            }
+            onClose()
+          } catch {
+            // Toast already shown
+          }
         }}
       >
         {(fk) => (
