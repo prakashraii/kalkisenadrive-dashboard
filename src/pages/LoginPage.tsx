@@ -8,9 +8,7 @@ const schema = Yup.object({
   password: Yup.string().min(8, 'At least 8 characters').required('Required'),
 })
 
-const initialValues = import.meta.env.DEV
-  ? { email: 'admin@kalki.local', password: 'KalkiAdmin@123' }
-  : { email: '', password: '' }
+const initialValues = { email: '', password: '' }
 
 export function LoginPage() {
   const vm = useLoginViewModel()
