@@ -23,7 +23,7 @@ export function LoginPage() {
       </div>
       <div className="flex flex-1 items-center justify-center bg-page p-6">
         <Formik
-          initialValues={{ email: 'admin@kalki.local', password: 'KalkiAdmin@123' }}
+          initialValues={{ email: '', password: '' }}
           validationSchema={schema}
           onSubmit={async (values, helpers) => {
             try {
@@ -36,7 +36,7 @@ export function LoginPage() {
           {(fk) => (
             <form onSubmit={fk.handleSubmit} className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-sm">
               <h2 className="text-2xl font-semibold">Sign in</h2>
-              <p className="mt-1 text-sm text-slate-500">Use the seeded admin account to continue.</p>
+              <p className="mt-1 text-sm text-slate-500">Enter your admin credentials to continue.</p>
               <div className="mt-6 space-y-4">
                 <FormField label="Email" error={fk.touched.email ? fk.errors.email : undefined} required>
                   <TextInput name="email" value={fk.values.email} onChange={fk.handleChange} error={fk.touched.email ? fk.errors.email : undefined} />
