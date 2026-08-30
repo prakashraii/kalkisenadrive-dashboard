@@ -4,6 +4,7 @@ import { Check } from 'lucide-react'
 import * as Yup from 'yup'
 import { api } from '../../lib/api'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
+import { ImageUpload } from '../ui/ImageUpload'
 
 const fieldClass =
   'h-11 w-full rounded-lg bg-[#E5E5E5] px-4 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
@@ -43,6 +44,7 @@ export function WalletSettingForm({
   const initialValues = {
     name: wallet?.name ?? '',
     details: wallet?.details ?? '',
+    qrUrl: wallet?.qrUrl ?? '',
   }
 
   return (
@@ -55,6 +57,7 @@ export function WalletSettingForm({
           const payload = {
             name: values.name.trim(),
             details: values.details.trim(),
+            qrUrl: values.qrUrl.trim() || undefined,
             isDefault: wallet?.isDefault ?? isNew,
           }
           try {
@@ -102,6 +105,14 @@ export function WalletSettingForm({
                 <p className="mt-1 text-xs text-rose-600">{fk.errors.details}</p>
               )}
             </div>
+
+            <ImageUpload
+              value={fk.values.qrUrl}
+              onChange={(url) => void fk.setFieldValue('qrUrl', url)}
+              folder="payments"
+              label="QR code"
+              className="min-h-[220px]"
+            />
 
             <div className="mt-4 flex justify-center gap-3">
               <button

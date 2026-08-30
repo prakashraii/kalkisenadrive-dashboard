@@ -9,6 +9,7 @@ import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { isUploadedVideo, mediaUrl, youtubeEmbedUrl, youtubeVideoId } from '../../lib/media'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
+import { ImageUpload } from '../ui/ImageUpload'
 
 const fieldClass =
   'h-11 w-full rounded-lg bg-[#E5E5E5] px-4 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
@@ -362,13 +363,13 @@ export function VideoDetailsForm({
                         <p className="mt-1 text-xs text-rose-600">{fk.errors.title}</p>
                       )}
                     </div>
-                    <input
-                      name="thumbnailUrl"
+                    <ImageUpload
                       value={fk.values.thumbnailUrl}
-                      onChange={fk.handleChange}
-                      readOnly={readOnly}
-                      placeholder="Thumbnail URL"
-                      className={fieldClass}
+                      onChange={(url) => void fk.setFieldValue('thumbnailUrl', url)}
+                      disabled={readOnly}
+                      folder="videos"
+                      label="Thumbnail"
+                      className="min-h-[140px]"
                     />
                     <textarea
                       name="description"
@@ -432,13 +433,13 @@ export function VideoDetailsForm({
                         <p className="mt-1 text-xs text-rose-600">{fk.errors.title}</p>
                       )}
                     </div>
-                    <input
-                      name="thumbnailUrl"
+                    <ImageUpload
                       value={fk.values.thumbnailUrl}
-                      onChange={fk.handleChange}
-                      readOnly={readOnly}
-                      placeholder="Thumbnail URL"
-                      className={fieldClass}
+                      onChange={(url) => void fk.setFieldValue('thumbnailUrl', url)}
+                      disabled={readOnly}
+                      folder="videos"
+                      label="Thumbnail"
+                      className="min-h-[140px]"
                     />
                     <textarea
                       name="description"

@@ -6,15 +6,13 @@ import * as Yup from 'yup'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
+import { ImageUpload } from '../ui/ImageUpload'
 
 const fieldClass =
   'h-11 w-full rounded-lg bg-[#E5E5E5] px-4 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
 
 const textareaClass =
   'min-h-[160px] w-full resize-none rounded-lg bg-[#E5E5E5] px-4 py-3 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
-
-const coverClass =
-  'min-h-[420px] w-full flex-1 resize-none rounded-lg bg-[#E5E5E5] px-4 py-3 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
 
 const LANGUAGES = [
   { value: 'en', label: 'English' },
@@ -436,22 +434,22 @@ export function BookDetailsForm({
                 )}
 
                 {step === 'details' ? (
-                  <textarea
-                    name="coverUrl"
+                  <ImageUpload
                     value={fk.values.coverUrl}
-                    onChange={fk.handleChange}
-                    readOnly={readOnly}
-                    placeholder="Cover image URL"
-                    className={coverClass}
+                    onChange={(url) => void fk.setFieldValue('coverUrl', url)}
+                    disabled={readOnly}
+                    folder="books"
+                    label="Cover image"
+                    className="min-h-[420px]"
                   />
                 ) : (
-                  <textarea
-                    name={`chapters.${safeIndex}.contentUrl`}
+                  <ImageUpload
                     value={chapter.contentUrl ?? ''}
-                    onChange={(e) => setChapter({ contentUrl: e.target.value })}
-                    readOnly={readOnly}
-                    placeholder="Chapter image or file URL"
-                    className={coverClass}
+                    onChange={(url) => setChapter({ contentUrl: url })}
+                    disabled={readOnly}
+                    folder="books"
+                    label="Chapter image"
+                    className="min-h-[420px]"
                   />
                 )}
               </div>

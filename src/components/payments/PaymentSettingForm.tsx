@@ -6,15 +6,13 @@ import * as Yup from 'yup'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
+import { ImageUpload } from '../ui/ImageUpload'
 
 const fieldClass =
   'h-11 w-full rounded-lg bg-[#E5E5E5] px-4 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
 
 const textareaClass =
   'min-h-[160px] w-full resize-none rounded-lg bg-[#E5E5E5] px-4 py-3 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
-
-const coverClass =
-  'min-h-[420px] w-full flex-1 resize-none rounded-lg bg-[#E5E5E5] px-4 py-3 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
 
 const BANKS = [
   'Nabil Bank',
@@ -235,12 +233,12 @@ export function PaymentSettingForm({
                 />
               </div>
 
-              <textarea
-                name="qrUrl"
+              <ImageUpload
                 value={fk.values.qrUrl}
-                onChange={fk.handleChange}
-                placeholder="QR code or image URL"
-                className={coverClass}
+                onChange={(url) => void fk.setFieldValue('qrUrl', url)}
+                folder="payments"
+                label="QR code"
+                className="min-h-[420px]"
               />
             </div>
 
