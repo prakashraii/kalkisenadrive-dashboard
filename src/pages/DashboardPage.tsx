@@ -24,6 +24,7 @@ import {
   Users,
   Wallet,
 } from 'lucide-react'
+import { KeyStatCards } from '../components/dashboard/KeyStatCards'
 import { SnapshotList } from '../components/dashboard/SnapshotList'
 import { StatCard } from '../components/ui/StatCard'
 import { api, type Paginated, type PaymentRow } from '../lib/api'
@@ -48,6 +49,12 @@ type Summary = {
   donationAnalytics: { months: string[]; years: number[]; series: { year: number; data: number[] }[] }
   bookSellAnalytics: { months: string[]; years: number[]; series: { year: number; data: number[] }[] }
   membershipAnalytics: { name: string; count: number }[]
+  overview?: {
+    donatedUsers: { value: number; trendPct: number }
+    members: { value: number; trendPct: number }
+    clinics: { value: number; trendPct: number }
+    drivers: { value: number; trendPct: number }
+  }
 }
 
 type ClinicRow = {
@@ -112,22 +119,42 @@ export function DashboardPage() {
       return row
     }) ?? []
 
+  const overview = data?.overview
+
   return (
     <div className="space-y-5">
+      <KeyStatCards
+        donatedUsers={{
+          value: overview?.donatedUsers.value ?? donated.data?.meta.total ?? 0,
+          trend: overview?.donatedUsers.trendPct,
+        }}
+        members={{
+          value: overview?.members.value ?? members.data?.meta.total ?? 0,
+          trend: overview?.members.trendPct,
+        }}
+        clinics={{
+          value: overview?.clinics.value ?? clinics.data?.meta.total ?? k?.totalClinics ?? 0,
+          trend: overview?.clinics.trendPct,
+        }}
+        drivers={{
+          value: overview?.drivers.value ?? drivers.data?.meta.total ?? k?.totalDriverRegistrations ?? 0,
+          trend: overview?.drivers.trendPct,
+        }}
+      />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard title="Total Donation" value={k?.totalDonationCents ?? 0} money icon={<Wallet className="size-5" />} tone="violet" />
-        <StatCard title="Book Sell Amount" value={k?.bookSellAmountCents ?? 0} money icon={<BookOpen className="size-5" />} tone="blue" />
-        <StatCard title="Total Book Order" value={k?.totalBookOrders ?? 0} icon={<ShoppingBag className="size-5" />} tone="teal" />
-        <StatCard title="Total Driver Registration" value={k?.totalDriverRegistrations ?? 0} icon={<CarFront className="size-5" />} tone="pink" />
-        <StatCard title="Total Clinic Members" value={k?.totalClinicMembers ?? 0} icon={<Users className="size-5" />} tone="orange" />
+        <StatCard title="Total Donation" value={k?.totalDonationCents ?? 0} money icon={<Wallet className="size-4" />} tone="violet" />
+        <StatCard title="Book Sell Amount" value={k?.bookSellAmountCents ?? 0} money icon={<BookOpen className="size-4" />} tone="blue" />
+        <StatCard title="Total Book Order" value={k?.totalBookOrders ?? 0} icon={<ShoppingBag className="size-4" />} tone="teal" />
+        <StatCard title="Total Driver Registration" value={k?.totalDriverRegistrations ?? 0} icon={<CarFront className="size-4" />} tone="pink" />
+        <StatCard title="Total Clinic Members" value={k?.totalClinicMembers ?? 0} icon={<Users className="size-4" />} tone="orange" />
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-        <StatCard title="Doctor Donation" value={k?.doctorDonationCents ?? 0} money icon={<Stethoscope className="size-5" />} tone="violet" />
-        <StatCard title="Dowry Donation" value={k?.dowryDonationCents ?? 0} money icon={<HeartHandshake className="size-5" />} tone="blue" />
-        <StatCard title="Inside Valley Book Sell" value={k?.insideValleyBookSell ?? 0} money icon={<BookOpen className="size-5" />} tone="teal" />
-        <StatCard title="Outside Valley Book Sell" value={k?.outsideValleyBookSell ?? 0} money icon={<BookOpen className="size-5" />} tone="pink" />
-        <StatCard title="Total Clinic" value={k?.totalClinics ?? 0} icon={<Building2 className="size-5" />} tone="orange" />
-        <StatCard title="Total App Users" value={k?.totalAppUsers ?? 0} icon={<Users className="size-5" />} tone="green" />
+        <StatCard title="Doctor Donation" value={k?.doctorDonationCents ?? 0} money icon={<Stethoscope className="size-4" />} tone="violet" />
+        <StatCard title="Dowry Donation" value={k?.dowryDonationCents ?? 0} money icon={<HeartHandshake className="size-4" />} tone="blue" />
+        <StatCard title="Inside Valley Book Sell" value={k?.insideValleyBookSell ?? 0} money icon={<BookOpen className="size-4" />} tone="teal" />
+        <StatCard title="Outside Valley Book Sell" value={k?.outsideValleyBookSell ?? 0} money icon={<BookOpen className="size-4" />} tone="pink" />
+        <StatCard title="Total Clinic" value={k?.totalClinics ?? 0} icon={<Building2 className="size-4" />} tone="orange" />
+        <StatCard title="Total App Users" value={k?.totalAppUsers ?? 0} icon={<Users className="size-4" />} tone="green" />
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.4fr_1fr]">
