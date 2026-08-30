@@ -1,7 +1,7 @@
-import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { BookOpen, Building2, CarFront, HeartHandshake, Plus, Users } from 'lucide-react'
+import { useState } from 'react'
 import { api, type PaymentRow } from '../lib/api'
 import { countryName, flagEmoji } from '../lib/cn'
 import { ActionButtons } from '../components/ui/Actions'
@@ -70,53 +70,32 @@ const USER_COLUMNS = ['ID', 'User Name', 'Contact Details', 'Member ID', 'Countr
 const DRIVER_COLUMNS = ['ID', 'User Name', 'Contact Details', 'License', 'Vehicle', 'City', 'Status', 'Action']
 const ORDER_COLUMNS = ['ID', 'User Name', 'Items', 'City', 'Amount', 'Bank/Wallet', 'Trans. ID', 'Status', 'Action']
 
+function stubUser(id: string): User {
+  return {
+    id,
+    publicId: '',
+    memberCode: '',
+    name: '',
+    phone: '',
+    countryCode: 'NP',
+    status: 'ACTIVE',
+  }
+}
+
+function tabFromParam(value: string | null): Tab {
+  return TABS.some((t) => t.id === value) ? (value as Tab) : 'donations'
+}
+
 export function UsersPage() {
   const navigate = useNavigate()
-  const [tab, setTab] = useState<Tab>('donations')
+  const [params, setParams] = useSearchParams()
+  const tab = tabFromParam(params.get('tab'))
+  const form = params.get('form')
+  const viewId = params.get('view')
   const path = TABS.find((t) => t.id === tab)!.path
   const list = useAdminList(tab, path)
   const mut = useAdminMutation(['users', 'donations', 'members', 'drivers', 'book-orders', 'dashboard-summary'])
-  const [edit, setEdit] = useState<User | 'new' | null>(null)
-  const [formMode, setFormMode] = useState<'new' | 'edit' | 'view'>('edit')
   const [del, setDel] = useState<User | null>(null)
-
-  function openForm(next: User | 'new', mode: 'new' | 'edit' | 'view' = next === 'new' ? 'new' : 'edit') {
-    setEdit(next)
-    setFormMode(mode)
-    navigate(mode === 'new' ? '/users?form=new' : `/users?form=${mode}`)
-  }
-
-  function openUserView(user: User) {
-    openForm(user, 'view')
-  }
-
-  function openPaymentUser(row: PaymentRow) {
-    if (row.userId) {
-      openUserView({
-        id: row.userId,
-        publicId: row.publicId,
-        memberCode: row.memberId,
-        name: row.userName,
-        email: row.email,
-        phone: row.phone,
-        countryCode: row.countryCode,
-        city: row.city,
-        status: row.status,
-      })
-      return
-    }
-    if (tab === 'members') {
-      navigate(`/memberships?view=${row.id}`)
-      return
-    }
-    if (row.donationId) navigate(`/donations?view=${row.donationId}`)
-  }
-
-  function closeForm() {
-    setEdit(null)
-    setFormMode('edit')
-    navigate('/users')
-  }
 
   const { data: summary } = useQuery({
     queryKey: ['dashboard-summary'],
@@ -135,15 +114,38 @@ export function UsersPage() {
   })
 
   function changeTab(next: Tab) {
-    setTab(next)
     list.setPage(1)
+    setParams({ tab: next })
+  }
+
+  function closeForm() {
+    setParams({ tab })
+  }
+
+  function openUser(id: string, mode: 'view' | 'edit') {
+    setParams(mode === 'view' ? { tab, view: id } : { tab, form: id })
   }
 
   const k = summary?.kpis
   const paymentTabs = tab === 'donations' || tab === 'members'
 
-  if (edit) {
-    return <UserDetailsForm edit={edit} onClose={closeForm} readOnly={formMode === 'view'} />
+  if (form === 'new') {
+    return <UserDetailsForm edit="new" onClose={closeForm} />
+  }
+
+  if (form) {
+    return <UserDetailsForm edit={stubUser(form)} onClose={closeForm} />
+  }
+
+  if (viewId) {
+    return (
+      <UserDetailsForm
+        edit={stubUser(viewId)}
+        onClose={closeForm}
+        readOnly
+        onEdit={() => setParams({ tab, form: viewId })}
+      />
+    )
   }
 
   return (
@@ -181,7 +183,7 @@ export function UsersPage() {
           <h2 className="text-xl font-normal text-black">User List</h2>
           <button
             type="button"
-            onClick={() => openForm('new')}
+            onClick={() => setParams({ tab, form: 'new' })}
             className="inline-flex h-11 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white"
           >
             <Plus className="size-4" />
@@ -222,13 +224,32 @@ export function UsersPage() {
                     <StatusBadge status={u.status} />
                   </td>
                   <td className="px-2.5 py-4">
-                    <ActionButtons onView={() => openUserView(u)} onEdit={() => openForm(u, 'edit')} onDelete={() => setDel(u)} />
+                    <ActionButtons
+                      onView={() => openUser(u.id, 'view')}
+                      onEdit={() => openUser(u.id, 'edit')}
+                      onDelete={() => setDel(u)}
+                    />
                   </td>
                 </tr>
               ))}
             </DataTable>
           )}
-          {paymentTabs && <PaymentTable rows={(list.data?.data ?? []) as PaymentRow[]} onView={openPaymentUser} />}
+          {paymentTabs && (
+            <PaymentTable
+              rows={(list.data?.data ?? []) as PaymentRow[]}
+              onView={(row) => {
+                if (row.userId) {
+                  openUser(row.userId, 'view')
+                  return
+                }
+                if (tab === 'donations' && row.donationId) {
+                  navigate(`/donations?view=${row.donationId}`)
+                  return
+                }
+                if (tab === 'members') navigate(`/memberships?view=${row.id}`)
+              }}
+            />
+          )}
           {tab === 'drivers' && (
             <DataTable columns={DRIVER_COLUMNS}>
               {((list.data?.data ?? []) as Driver[]).map((d) => (
@@ -247,18 +268,7 @@ export function UsersPage() {
                   <td className="px-2.5 py-4">
                     <ActionButtons
                       onView={() =>
-                        d.userId
-                          ? openUserView({
-                              id: d.userId,
-                              publicId: d.publicId,
-                              memberCode: '',
-                              name: d.name,
-                              phone: d.phone,
-                              countryCode: d.countryCode ?? 'NP',
-                              city: d.city,
-                              status: d.status,
-                            })
-                          : navigate(`/drivers?view=${d.id}&tab=details`)
+                        d.userId ? openUser(d.userId, 'view') : navigate(`/drivers?view=${d.id}&tab=details`)
                       }
                     />
                   </td>
@@ -283,18 +293,7 @@ export function UsersPage() {
                   <td className="px-2.5 py-4">
                     <ActionButtons
                       onView={() =>
-                        o.userId
-                          ? openUserView({
-                              id: o.userId,
-                              publicId: o.publicId,
-                              memberCode: '',
-                              name: o.userName,
-                              phone: '',
-                              countryCode: o.countryCode ?? 'NP',
-                              city: o.city,
-                              status: o.status,
-                            })
-                          : navigate(`/books/orders?view=${o.id}`)
+                        o.userId ? openUser(o.userId, 'view') : navigate(`/books/orders?view=${o.id}`)
                       }
                     />
                   </td>

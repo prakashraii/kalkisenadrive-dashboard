@@ -1,7 +1,8 @@
-import { Globe, Link2, Lock, Pencil, Share2, Trash2 } from 'lucide-react'
+import { Copy, Globe, Link2, Lock, Share2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '../../lib/cn'
 import { isUploadedVideo, mediaUrl, videoThumbnail } from '../../lib/media'
+import { ActionButtons } from '../ui/Actions'
 import type { Video } from './VideoDetailsForm'
 
 function formatCardDate(value: string) {
@@ -37,10 +38,12 @@ async function copyText(value: string, ok: string) {
 
 export function VideoListCard({
   video,
+  onView,
   onEdit,
   onDelete,
 }: {
   video: Video
+  onView: () => void
   onEdit: () => void
   onDelete: () => void
 }) {
@@ -69,7 +72,7 @@ export function VideoListCard({
     <article className="grid grid-cols-1 items-center gap-4 rounded-xl bg-white px-4 py-3.5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] lg:grid-cols-[140px_minmax(0,1.4fr)_120px_100px_80px_56px_228px] lg:gap-5 lg:px-5">
       <button
         type="button"
-        onClick={onEdit}
+        onClick={onView}
         className="h-[86px] w-[140px] overflow-hidden rounded-lg bg-[#E5E5E5]"
       >
         {thumb ? (
@@ -84,7 +87,7 @@ export function VideoListCard({
       </button>
 
       <div className="min-w-0">
-        <button type="button" onClick={onEdit} className="block w-full text-left">
+        <button type="button" onClick={onView} className="block w-full text-left">
           <h3 className="truncate text-[15px] font-semibold text-black">{video.title}</h3>
         </button>
         {href ? (
@@ -125,8 +128,9 @@ export function VideoListCard({
         {kind}
       </p>
 
-      <div className="flex w-full flex-col gap-2">
-        <div className="grid grid-cols-2 gap-2">
+      <div className="flex w-full flex-col items-end gap-2">
+        <ActionButtons onView={onView} onEdit={onEdit} onDelete={onDelete} />
+        <div className="grid w-full grid-cols-2 gap-2">
           <button
             type="button"
             onClick={() => void share()}
@@ -137,21 +141,19 @@ export function VideoListCard({
           </button>
           <button
             type="button"
-            onClick={onEdit}
+            onClick={() => {
+              if (!href) {
+                toast.error('No video link')
+                return
+              }
+              void copyText(href, 'Link copied')
+            }}
             className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-black/15 bg-white text-xs text-black"
           >
-            <Pencil className="size-3.5" />
-            Edit
+            <Copy className="size-3.5" />
+            Copy Link
           </button>
         </div>
-        <button
-          type="button"
-          onClick={onDelete}
-          className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-rose-200 text-xs text-rose-600 hover:bg-rose-50"
-        >
-          <Trash2 className="size-3.5" />
-          Delete
-        </button>
       </div>
     </article>
   )

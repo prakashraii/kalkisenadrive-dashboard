@@ -21,6 +21,8 @@ type Order = {
   items: { titleSnapshot: string; qty: number }[]
 }
 
+const COLUMNS = ['Order', 'User', 'Items', 'Region', 'Amount', 'Status', 'Action']
+
 export function BookOrdersPage() {
   const [params, setParams] = useSearchParams()
   const viewId = params.get('view')
@@ -33,10 +35,10 @@ export function BookOrdersPage() {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-4">
-        <h2 className="text-xl font-normal text-black">Book orders</h2>
+        <h2 className="text-xl font-normal text-black">Book Orders</h2>
         <TableToolbar search={list.search} onSearch={list.setSearch} country={list.country} onCountry={list.setCountry} />
         <TableFrame>
-          <DataTable columns={['Order', 'User', 'Items', 'Region', 'Amount', 'Status', 'Action']}>
+          <DataTable columns={COLUMNS}>
             {(list.data?.data ?? []).map((o) => (
               <tr key={o.id} className="text-[#262626]">
                 <td className="px-2.5 py-4">{o.publicId}</td>

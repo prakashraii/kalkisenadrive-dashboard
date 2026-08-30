@@ -140,7 +140,6 @@ function MediaSlot({
   fileName,
   driverId,
   tall,
-  locked,
 }: {
   label: string
   kind: DriverDocumentKind
@@ -148,7 +147,6 @@ function MediaSlot({
   fileName?: string | null
   driverId?: string
   tall?: boolean
-  locked?: boolean
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const qc = useQueryClient()
@@ -173,7 +171,7 @@ function MediaSlot({
   return (
     <button
       type="button"
-      disabled={!driverId || busy || locked}
+      disabled={!driverId || busy}
       onClick={() => inputRef.current?.click()}
       className={cn(
         'relative flex items-center justify-center overflow-hidden rounded-lg bg-[#E5E5E5] text-sm text-[#262626] disabled:cursor-not-allowed',
@@ -194,12 +192,10 @@ export function DriverDetailsForm({
   driverId,
   onClose,
   onCreated,
-  readOnly = false,
 }: {
   driverId?: string
   onClose: () => void
   onCreated?: (id: string) => void
-  readOnly?: boolean
 }) {
   const [params, setParams] = useSearchParams()
   const tab = tabFromParam(params.get('tab'))
@@ -249,7 +245,6 @@ export function DriverDetailsForm({
         initialValues={initialValues}
         validationSchema={schema}
         onSubmit={async (values) => {
-          if (readOnly) return
           const payload = {
             name: values.name,
             phone: values.phone,
@@ -281,20 +276,20 @@ export function DriverDetailsForm({
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
                 <div className="flex flex-col gap-6">
                   <div>
-                    <input name="name" value={fk.values.name} onChange={fk.handleChange} readOnly={readOnly} placeholder="Driver Name" className={fieldClass} />
+                    <input name="name" value={fk.values.name} onChange={fk.handleChange} placeholder="Driver Name" className={fieldClass} />
                     {fk.touched.name && fk.errors.name && <p className="mt-1 text-xs text-rose-600">{fk.errors.name}</p>}
                   </div>
                   <div>
-                    <input name="email" value={fk.values.email} onChange={fk.handleChange} readOnly={readOnly} placeholder="Email" className={fieldClass} />
+                    <input name="email" value={fk.values.email} onChange={fk.handleChange} placeholder="Email" className={fieldClass} />
                     {fk.touched.email && fk.errors.email && <p className="mt-1 text-xs text-rose-600">{fk.errors.email}</p>}
                   </div>
                   <div>
-                    <input name="phone" value={fk.values.phone} onChange={fk.handleChange} readOnly={readOnly} placeholder="Phone" className={fieldClass} />
+                    <input name="phone" value={fk.values.phone} onChange={fk.handleChange} placeholder="Phone" className={fieldClass} />
                     {fk.touched.phone && fk.errors.phone && <p className="mt-1 text-xs text-rose-600">{fk.errors.phone}</p>}
                   </div>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <input name="memberCode" value={fk.values.memberCode} readOnly placeholder="Member ID" className={fieldClass} />
-                    <FilledSelect name="countryCode" value={fk.values.countryCode} onChange={fk.handleChange} disabled={readOnly}>
+                    <FilledSelect name="countryCode" value={fk.values.countryCode} onChange={fk.handleChange}>
                       <option value="NP">Nepal</option>
                       <option value="US">USA</option>
                       <option value="GB">UK</option>
@@ -302,8 +297,8 @@ export function DriverDetailsForm({
                     </FilledSelect>
                   </div>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <input name="city" value={fk.values.city} onChange={fk.handleChange} readOnly={readOnly} placeholder="City" className={fieldClass} />
-                    <FilledSelect name="status" value={fk.values.status} onChange={fk.handleChange} disabled={readOnly}>
+                    <input name="city" value={fk.values.city} onChange={fk.handleChange} placeholder="City" className={fieldClass} />
+                    <FilledSelect name="status" value={fk.values.status} onChange={fk.handleChange}>
                       <option value="PENDING">Pending</option>
                       <option value="APPROVED">Approved</option>
                       <option value="REJECTED">Rejected</option>
@@ -319,7 +314,6 @@ export function DriverDetailsForm({
                       url={docMap[slot.kind]?.fileUrl}
                       fileName={docMap[slot.kind]?.fileName}
                       driverId={driverId}
-                      locked={readOnly}
                     />
                   ))}
                 </div>
@@ -329,7 +323,7 @@ export function DriverDetailsForm({
             {tab === 'vehicle' && (
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
                 <div className="flex flex-col gap-6">
-                  <FilledSelect name="vehicleType" value={fk.values.vehicleType} onChange={fk.handleChange} disabled={readOnly}>
+                  <FilledSelect name="vehicleType" value={fk.values.vehicleType} onChange={fk.handleChange}>
                     <option value="Bike">Vehicle Type — Bike</option>
                     <option value="Car">Vehicle Type — Car</option>
                     <option value="Scooter">Vehicle Type — Scooter</option>
@@ -339,7 +333,6 @@ export function DriverDetailsForm({
                       name="vehicleNumber"
                       value={fk.values.vehicleNumber}
                       onChange={fk.handleChange}
-                      readOnly={readOnly}
                       placeholder="Vehicle Number"
                       className={fieldClass}
                     />
@@ -352,7 +345,6 @@ export function DriverDetailsForm({
                       name="licenseNumber"
                       value={fk.values.licenseNumber}
                       onChange={fk.handleChange}
-                      readOnly={readOnly}
                       placeholder="License Number"
                       className={fieldClass}
                     />
@@ -365,7 +357,6 @@ export function DriverDetailsForm({
                       name="vehicleModel"
                       value={fk.values.vehicleModel}
                       onChange={fk.handleChange}
-                      readOnly={readOnly}
                       placeholder="Vehicle Model"
                       className={fieldClass}
                     />
@@ -373,7 +364,6 @@ export function DriverDetailsForm({
                       name="vehicleColor"
                       value={fk.values.vehicleColor}
                       onChange={fk.handleChange}
-                      readOnly={readOnly}
                       placeholder="Vehicle Color"
                       className={fieldClass}
                     />
@@ -383,7 +373,6 @@ export function DriverDetailsForm({
                       name="vehicleYear"
                       value={fk.values.vehicleYear}
                       onChange={fk.handleChange}
-                      readOnly={readOnly}
                       placeholder="Vehicle Year"
                       className={fieldClass}
                     />
@@ -391,7 +380,6 @@ export function DriverDetailsForm({
                       name="insuranceNumber"
                       value={fk.values.insuranceNumber}
                       onChange={fk.handleChange}
-                      readOnly={readOnly}
                       placeholder="Insurance Number"
                       className={fieldClass}
                     />
@@ -406,7 +394,6 @@ export function DriverDetailsForm({
                       url={docMap[slot.kind]?.fileUrl}
                       fileName={docMap[slot.kind]?.fileName}
                       driverId={driverId}
-                      locked={readOnly}
                     />
                   ))}
                 </div>
@@ -424,7 +411,6 @@ export function DriverDetailsForm({
                     url={docMap[slot.kind]?.fileUrl}
                     fileName={docMap[slot.kind]?.fileName}
                     driverId={driverId}
-                    locked={readOnly}
                   />
                 ))}
               </div>
@@ -453,15 +439,13 @@ export function DriverDetailsForm({
                     </button>
                   </>
                 )}
-                {!readOnly && (
-                  <button
-                    type="submit"
-                    disabled={fk.isSubmitting}
-                    className="h-11 rounded-md bg-accent px-6 text-sm font-medium text-black disabled:opacity-60"
-                  >
-                    {fk.isSubmitting ? 'Saving…' : isNew ? 'Create' : 'Save'}
-                  </button>
-                )}
+                <button
+                  type="submit"
+                  disabled={fk.isSubmitting}
+                  className="h-11 rounded-md bg-accent px-6 text-sm font-medium text-black disabled:opacity-60"
+                >
+                  {fk.isSubmitting ? 'Saving…' : isNew ? 'Create' : 'Save'}
+                </button>
               </div>
             )}
 

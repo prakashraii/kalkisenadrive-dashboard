@@ -4,6 +4,7 @@ import { Coins, UserPlus, Users } from 'lucide-react'
 import { api, type PaymentRow } from '../lib/api'
 import { useAdminList } from '../viewmodels/useAdminCrud'
 import { MemberDetailsForm } from '../components/memberships/MemberDetailsForm'
+import { MembershipCreateForm } from '../components/memberships/MembershipCreateForm'
 import { PlanDetailsForm } from '../components/memberships/PlanDetailsForm'
 import { MetricCard } from '../components/ui/MetricCard'
 import { Pagination } from '../components/ui/Pagination'
@@ -27,7 +28,7 @@ export function MembershipsPage() {
   }
 
   if (form === 'new') {
-    return <MemberDetailsForm membershipId="new" onClose={() => setParams({})} />
+    return <MembershipCreateForm onClose={() => setParams({})} />
   }
 
   if (viewId) {

@@ -77,8 +77,9 @@ export function DashboardLayout() {
 
   const params = new URLSearchParams(location.search)
   const formMode = params.get('form')
+  const userView = location.pathname === '/users' && params.get('view')
   const formTitle =
-    location.pathname === '/users' && formMode
+    location.pathname === '/users' && (formMode || userView)
       ? formMode === 'new'
         ? 'Add User'
         : 'User Details'
@@ -90,29 +91,34 @@ export function DashboardLayout() {
     general: 'General Donation',
   }
   const donationTabLabel = donationTabLabels[params.get('tab') ?? 'all'] ?? 'Donation'
-  const donationForm = location.pathname === '/donations' && params.get('form')
   const donationView = location.pathname === '/donations' && params.get('view')
+  const donationForm = location.pathname === '/donations' && formMode === 'new'
   const donationTitle = location.pathname === '/donations'
-    ? donationForm === 'new'
+    ? donationForm
       ? 'Record Donation'
       : donationView
         ? 'User Details'
         : donationTabLabel
     : null
-  const membershipForm = location.pathname === '/memberships' ? params.get('form') : null
   const membershipView = location.pathname === '/memberships' && params.get('view')
-  const membershipTitle = membershipForm === 'plan'
-    ? 'Add Plan'
-    : membershipForm === 'new'
-      ? 'Add Membership'
-      : membershipView
-        ? 'Member Details'
-        : null
-  const clinicView = location.pathname === '/clinics' && (params.get('view') || params.get('form'))
-  const clinicTitle = location.pathname === '/clinics' ? (clinicView ? 'Clinic Details' : 'Clinic List') : null
-  const driverForm = location.pathname === '/drivers' && (params.get('form') || params.get('view'))
-  const driverTitle = location.pathname === '/drivers' ? (driverForm ? 'Driver Details' : 'Drivers List') : null
-  const bookForm = location.pathname === '/books' ? params.get('form') : null
+  const membershipForm = location.pathname === '/memberships' && formMode
+  const membershipTitle = membershipForm
+    ? formMode === 'plan'
+      ? 'Add Plan'
+      : 'Add Membership'
+    : membershipView
+      ? 'Member Details'
+      : null
+  const clinicForm = location.pathname === '/clinics' && formMode
+  const clinicView = location.pathname === '/clinics' && params.get('view')
+  const clinicTitle = location.pathname === '/clinics'
+    ? clinicForm === 'new'
+      ? 'Add Clinic'
+      : clinicForm || clinicView
+        ? 'Clinic Details'
+        : 'Clinic List'
+    : null
+  const bookForm = location.pathname === '/books' && formMode
   const bookView = location.pathname === '/books' && params.get('view')
   const bookTitle = location.pathname === '/books'
     ? bookForm === 'new'
@@ -122,11 +128,26 @@ export function DashboardLayout() {
         : 'Books Sell'
     : null
   const orderView = location.pathname === '/books/orders' && params.get('view')
-  const orderTitle = location.pathname === '/books/orders' ? (orderView ? 'Order Details' : 'Book Orders') : null
-  const videoForm = location.pathname === '/videos' && (params.get('form') || params.get('view'))
+  const orderTitle = orderView ? 'Order Details' : null
+  const driverForm = location.pathname === '/drivers' && formMode === 'new'
+  const driverView = location.pathname === '/drivers' && params.get('view')
+  const driverTitle = location.pathname === '/drivers'
+    ? driverForm
+      ? 'Add Registration'
+      : driverView
+        ? 'Driver Details'
+        : null
+    : null
+  const videoForm = location.pathname === '/videos' && (formMode || params.get('view'))
   const videoUploadTitle = params.get('tab') === 'link' ? 'Upload Link' : 'Upload Video'
-  const videoTitle = location.pathname === '/videos' ? (videoForm ? videoUploadTitle : 'Video List') : null
-  const paymentForm = location.pathname === '/payments' && params.get('form')
+  const videoTitle = location.pathname === '/videos'
+    ? formMode === 'new'
+      ? videoUploadTitle
+      : videoForm
+        ? 'Video Details'
+        : 'Video List'
+    : null
+  const paymentForm = location.pathname === '/payments' && formMode
   const paymentView = location.pathname === '/payments' && params.get('view')
   const paymentWallet = params.get('type') === 'wallet'
   const paymentTitle = location.pathname === '/payments'
@@ -140,13 +161,13 @@ export function DashboardLayout() {
         ? 'Payment Details'
         : 'Manage Accounts'
     : null
-  const title =
-    formTitle ?? donationTitle ?? membershipTitle ?? clinicTitle ?? driverTitle ?? bookTitle ?? orderTitle ?? videoTitle ?? paymentTitle ?? titles[location.pathname] ?? 'Dashboard'
+  const detailTitle = formTitle ?? donationTitle ?? membershipTitle ?? clinicTitle ?? bookTitle ?? orderTitle ?? driverTitle ?? videoTitle ?? paymentTitle
+  const title = detailTitle ?? titles[location.pathname] ?? 'Dashboard'
   const crumb = formTitle ? (
     <>
       Menu / User List / <span className="text-[#7EB6FF]">{formTitle}</span>
     </>
-  ) : donationForm === 'new' ? (
+  ) : donationForm ? (
     <>
       Menu / {donationTabLabel} / <span className="text-[#7EB6FF]">Record Donation</span>
     </>
@@ -154,41 +175,33 @@ export function DashboardLayout() {
     <>
       Menu / {donationTabLabel} User List / <span className="text-[#7EB6FF]">User Details</span>
     </>
-  ) : membershipForm === 'plan' ? (
+  ) : membershipForm ? (
     <>
-      Menu / Membership / <span className="text-[#7EB6FF]">Add Plan</span>
-    </>
-  ) : membershipForm === 'new' ? (
-    <>
-      Menu / Membership / <span className="text-[#7EB6FF]">Add Membership</span>
+      Menu / Membership / <span className="text-[#7EB6FF]">{membershipTitle}</span>
     </>
   ) : membershipView ? (
     <>
       Menu / Membership / <span className="text-[#7EB6FF]">Member Details</span>
     </>
-  ) : driverForm ? (
+  ) : clinicForm || clinicView ? (
     <>
-      Menu / Driver Registration / <span className="text-[#7EB6FF]">Driver Details</span>
-    </>
-  ) : orderView ? (
-    <>
-      Menu / Book / <span className="text-[#7EB6FF]">Order Details</span>
-    </>
-  ) : clinicView ? (
-    <>
-      Menu / Clinic / <span className="text-[#7EB6FF]">Clinic Details</span>
-    </>
-  ) : bookForm === 'new' ? (
-    <>
-      Menu / Book / <span className="text-[#7EB6FF]">Add Book</span>
+      Menu / Clinic / <span className="text-[#7EB6FF]">{clinicTitle}</span>
     </>
   ) : bookForm || bookView ? (
     <>
-      Menu / Book / <span className="text-[#7EB6FF]">Book Details</span>
+      Menu / Book / <span className="text-[#7EB6FF]">{bookTitle}</span>
+    </>
+  ) : orderView ? (
+    <>
+      Menu / Book Orders / <span className="text-[#7EB6FF]">Order Details</span>
+    </>
+  ) : driverForm || driverView ? (
+    <>
+      Menu / Drivers / <span className="text-[#7EB6FF]">{driverTitle}</span>
     </>
   ) : videoForm ? (
     <>
-      Menu / Video / <span className="text-[#7EB6FF]">{videoUploadTitle}</span>
+      Menu / Video / <span className="text-[#7EB6FF]">{videoTitle}</span>
     </>
   ) : paymentForm ? (
     <>

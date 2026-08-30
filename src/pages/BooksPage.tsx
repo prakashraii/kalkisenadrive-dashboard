@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { BookOpen, Plus } from 'lucide-react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { BookDetailsForm, type Book } from '../components/books/BookDetailsForm'
 import { ActionButtons } from '../components/ui/Actions'
@@ -33,13 +33,12 @@ export function BooksPage() {
   }
 
   if (form) {
-    return <BookDetailsForm key={form} bookId={form} onClose={() => setParams({})} />
+    return <BookDetailsForm bookId={form} onClose={() => setParams({})} />
   }
 
   if (viewId) {
     return (
       <BookDetailsForm
-        key={`view-${viewId}`}
         bookId={viewId}
         readOnly
         onClose={() => setParams({})}
@@ -121,13 +120,12 @@ export function BooksPage() {
           />
         </TableFrame>
       </section>
-
       <ConfirmDialog
         open={!!del}
         title="Delete book"
-        message="Delete this book? This cannot be undone."
-        pending={mut.isPending}
+        message="This cannot be undone."
         onClose={() => setDel(null)}
+        pending={mut.isPending}
         onConfirm={async () => {
           if (!del) return
           await mut.mutateAsync(() => api.delete(`/admin/books/${del.id}`))

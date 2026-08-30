@@ -8,6 +8,10 @@ const schema = Yup.object({
   password: Yup.string().min(8, 'At least 8 characters').required('Required'),
 })
 
+const initialValues = import.meta.env.DEV
+  ? { email: 'admin@kalki.local', password: 'KalkiAdmin@123' }
+  : { email: '', password: '' }
+
 export function LoginPage() {
   const vm = useLoginViewModel()
 
@@ -23,7 +27,7 @@ export function LoginPage() {
       </div>
       <div className="flex flex-1 items-center justify-center bg-page p-6">
         <Formik
-          initialValues={{ email: '', password: '' }}
+          initialValues={initialValues}
           validationSchema={schema}
           onSubmit={async (values, helpers) => {
             try {

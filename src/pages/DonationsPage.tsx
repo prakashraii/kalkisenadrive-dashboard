@@ -4,6 +4,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Coins, UserPlus, Users } from 'lucide-react'
 import { api, type PaymentRow } from '../lib/api'
 import { useAdminList } from '../viewmodels/useAdminCrud'
+import { DonationRecordForm } from '../components/donations/DonationRecordForm'
 import { DonorDetailsForm } from '../components/donations/DonorDetailsForm'
 import { MetricCard } from '../components/ui/MetricCard'
 import { Pagination } from '../components/ui/Pagination'
@@ -46,7 +47,7 @@ export function DonationsPage() {
   }
 
   if (isNew) {
-    return <DonorDetailsForm donationId="new" defaultType={type ?? 'DOWRY'} onClose={() => setParams({ tab })} />
+    return <DonationRecordForm defaultType={type ?? 'DOWRY'} onClose={() => setParams({ tab })} />
   }
 
   if (viewId) {

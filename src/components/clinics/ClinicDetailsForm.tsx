@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query'
 import { Formik } from 'formik'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, Pencil } from 'lucide-react'
 import type { ChangeEventHandler, ReactNode } from 'react'
 import * as Yup from 'yup'
 import { api } from '../../lib/api'
@@ -105,10 +105,12 @@ export function ClinicDetailsForm({
   clinicId,
   onClose,
   readOnly = false,
+  onEdit,
 }: {
   clinicId: string | 'new'
   onClose: () => void
   readOnly?: boolean
+  onEdit?: () => void
 }) {
   const mut = useAdminMutation(['clinics', 'clinic-stats', 'dashboard-summary'])
   const isNew = clinicId === 'new'
@@ -133,9 +135,23 @@ export function ClinicDetailsForm({
 
   return (
     <div className="-mx-8 -my-8 min-h-full bg-white px-8 py-8">
-      {initialValues.publicId && (
-        <p className="mb-6 text-sm text-black/60">Clinic Registration ID: {initialValues.publicId}</p>
-      )}
+      <div className="mb-6 flex items-start justify-between gap-4">
+        {initialValues.publicId ? (
+          <p className="text-sm text-black/60">Clinic Registration ID: {initialValues.publicId}</p>
+        ) : (
+          <span />
+        )}
+        {readOnly && onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-black/12 px-3 text-sm text-black"
+          >
+            <Pencil className="size-4" />
+            Edit Details
+          </button>
+        )}
+      </div>
 
       <Formik
         enableReinitialize

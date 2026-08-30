@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { Building2, HeartHandshake, Link as LinkIcon, Plus, Users } from 'lucide-react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ClinicDetailsForm, type Clinic } from '../components/clinics/ClinicDetailsForm'
@@ -50,11 +50,18 @@ export function ClinicsPage() {
   }
 
   if (form) {
-    return <ClinicDetailsForm key={form} clinicId={form} onClose={() => setParams({})} />
+    return <ClinicDetailsForm clinicId={form} onClose={() => setParams({})} />
   }
 
   if (viewId) {
-    return <ClinicDetailsForm key={`view-${viewId}`} clinicId={viewId} readOnly onClose={() => setParams({})} />
+    return (
+      <ClinicDetailsForm
+        clinicId={viewId}
+        readOnly
+        onClose={() => setParams({})}
+        onEdit={() => setParams({ form: viewId })}
+      />
+    )
   }
 
   return (
@@ -155,13 +162,12 @@ export function ClinicsPage() {
           />
         </TableFrame>
       </section>
-
       <ConfirmDialog
         open={!!del}
         title="Delete clinic"
-        message="Delete this clinic? This cannot be undone."
-        pending={mut.isPending}
+        message="This cannot be undone."
         onClose={() => setDel(null)}
+        pending={mut.isPending}
         onConfirm={async () => {
           if (!del) return
           await mut.mutateAsync(() => api.delete(`/admin/clinics/${del.id}`))

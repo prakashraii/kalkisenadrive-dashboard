@@ -1,5 +1,5 @@
-import { useState } from 'react'
 import { Plus, Video as VideoIcon } from 'lucide-react'
+import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { VideoDetailsForm, type Video } from '../components/videos/VideoDetailsForm'
 import { VideoListCard } from '../components/videos/VideoListCard'
@@ -21,15 +21,35 @@ export function VideosPage() {
     return <VideoDetailsForm videoId="new" onClose={() => setParams({})} />
   }
 
+  if (form) {
+    return <VideoDetailsForm videoId={form} onClose={() => setParams({})} />
+  }
+
   if (viewId) {
-    return <VideoDetailsForm videoId={viewId} onClose={() => setParams({})} />
+    return (
+      <VideoDetailsForm
+        videoId={viewId}
+        readOnly
+        onClose={() => setParams({})}
+        onEdit={() =>
+          setParams({
+            form: viewId,
+            tab: params.get('tab') === 'link' ? 'link' : 'video',
+          })
+        }
+      />
+    )
   }
 
   const total = list.data?.meta.total ?? 0
   const empty = !list.isLoading && total === 0 && !list.search
 
-  function openForm(tab: 'video' | 'link' = 'video') {
+  function openNew(tab: 'video' | 'link' = 'video') {
     setParams({ form: 'new', tab })
+  }
+
+  function videoTab(video: Video) {
+    return isUploadedVideo(video.sourceUrl) ? 'video' : 'link'
   }
 
   if (empty) {
@@ -40,7 +60,7 @@ export function VideosPage() {
         </div>
         <button
           type="button"
-          onClick={() => openForm('video')}
+          onClick={() => openNew('video')}
           className="inline-flex h-11 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white"
         >
           <Plus className="size-4" />
@@ -58,7 +78,7 @@ export function VideosPage() {
         </button>
         <button
           type="button"
-          onClick={() => openForm('video')}
+          onClick={() => openNew('video')}
           className="inline-flex h-11 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white"
         >
           <Plus className="size-4" />
@@ -71,12 +91,8 @@ export function VideosPage() {
           <VideoListCard
             key={v.id}
             video={v}
-            onEdit={() =>
-              setParams({
-                view: v.id,
-                tab: isUploadedVideo(v.sourceUrl) ? 'video' : 'link',
-              })
-            }
+            onView={() => setParams({ view: v.id, tab: videoTab(v) })}
+            onEdit={() => setParams({ form: v.id, tab: videoTab(v) })}
             onDelete={() => setDel(v)}
           />
         ))}
@@ -95,9 +111,9 @@ export function VideosPage() {
       <ConfirmDialog
         open={!!del}
         title="Delete video"
-        message="Delete this video? This cannot be undone."
-        pending={mut.isPending}
+        message="This cannot be undone."
         onClose={() => setDel(null)}
+        pending={mut.isPending}
         onConfirm={async () => {
           if (!del) return
           await mut.mutateAsync(() => api.delete(`/admin/videos/${del.id}`))

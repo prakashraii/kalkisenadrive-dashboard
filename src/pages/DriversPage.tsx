@@ -44,17 +44,15 @@ function listTabFromParam(value: string | null): ListTab {
 export function DriversPage() {
   const [params, setParams] = useSearchParams()
   const viewId = params.get('view')
-  const form = params.get('form')
-  const isNew = form === 'new'
-  const editId = form && form !== 'new' ? form : null
-  const listTab = listTabFromParam(isNew || viewId || editId ? 'all' : params.get('tab'))
+  const isNew = params.get('form') === 'new'
+  const listTab = listTabFromParam(isNew || viewId ? 'all' : params.get('tab'))
   const status = LIST_TABS.find((t) => t.id === listTab)?.status
   const extra = useMemo(() => (status ? { status } : undefined), [status])
   const list = useAdminList<Driver>(`drivers-${listTab}`, '/admin/drivers', extra)
   const { data: stats } = useQuery({
     queryKey: ['driver-stats'],
     queryFn: async () => (await api.get<{ total: number; accepted: number; rejected: number }>('/admin/drivers/stats')).data,
-    enabled: !viewId && !isNew && !editId,
+    enabled: !viewId && !isNew,
   })
 
   function changeTab(next: ListTab) {
@@ -66,17 +64,13 @@ export function DriversPage() {
     return (
       <DriverDetailsForm
         onClose={() => setParams({ tab: 'all' })}
-        onCreated={(id) => setParams({ form: id, tab: 'details' })}
+        onCreated={(id) => setParams({ view: id, tab: 'details' })}
       />
     )
   }
 
-  if (editId) {
-    return <DriverDetailsForm key={editId} driverId={editId} onClose={() => setParams({ tab: 'all' })} />
-  }
-
   if (viewId) {
-    return <DriverDetailsForm key={`view-${viewId}`} driverId={viewId} readOnly onClose={() => setParams({ tab: 'all' })} />
+    return <DriverDetailsForm driverId={viewId} onClose={() => setParams({ tab: 'all' })} />
   }
 
   return (
@@ -138,10 +132,7 @@ export function DriversPage() {
                   <StatusBadge status={d.status} />
                 </td>
                 <td className="px-2.5 py-4">
-                  <ActionButtons
-                    onView={() => setParams({ view: d.id, tab: 'details' })}
-                    onEdit={() => setParams({ form: d.id, tab: 'details' })}
-                  />
+                  <ActionButtons onView={() => setParams({ view: d.id, tab: 'details' })} />
                 </td>
               </tr>
             ))}

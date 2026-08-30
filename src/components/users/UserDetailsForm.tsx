@@ -1,14 +1,14 @@
 import { useState, type ChangeEventHandler, type ReactNode } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Formik } from 'formik'
-import { ChevronDown, Search } from 'lucide-react'
+import { ChevronDown, Pencil, Search } from 'lucide-react'
 import * as Yup from 'yup'
 import { api, type Paginated, type PaymentRow } from '../../lib/api'
 import { cn, formatMoney } from '../../lib/cn'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
 import { Pagination } from '../ui/Pagination'
 import { PaymentTable } from '../ui/PaymentTable'
+import { PaymentDetailsForm } from '../payments/PaymentDetailsForm'
 import { TableFrame } from '../ui/DataTable'
 import { Tabs } from '../ui/Tabs'
 
@@ -109,12 +109,13 @@ export function UserDetailsForm({
   edit,
   onClose,
   readOnly = false,
+  onEdit,
 }: {
   edit: User | 'new'
   onClose: () => void
   readOnly?: boolean
+  onEdit?: () => void
 }) {
-  const navigate = useNavigate()
   const mut = useAdminMutation(['users', 'drivers', 'dashboard-summary'])
   const isNew = edit === 'new'
   const userId = isNew ? '' : edit.id
@@ -122,6 +123,7 @@ export function UserDetailsForm({
   const [payPage, setPayPage] = useState(1)
   const [paySearch, setPaySearch] = useState('')
   const [payMethod, setPayMethod] = useState<'WALLET' | 'BANK' | ''>('WALLET')
+  const [viewPay, setViewPay] = useState<PaymentRow | null>(null)
 
   const { data: details } = useQuery({
     queryKey: ['user-details', userId],
@@ -145,6 +147,10 @@ export function UserDetailsForm({
       ).data,
     enabled: !!userId && tab === 'payments',
   })
+
+  if (viewPay) {
+    return <PaymentDetailsForm paymentId={viewPay.id} onClose={() => setViewPay(null)} />
+  }
 
   const driver = details?.driverRegistrations?.[0]
   const membership = details?.memberships?.[0]
@@ -185,8 +191,18 @@ export function UserDetailsForm({
           {memberCode && <p className="text-black/60">Member ID: {memberCode}</p>}
         </div>
       )}
-      <div className="mb-8">
+      <div className="mb-8 flex items-center justify-between gap-3">
         <Tabs tabs={DETAILS_TABS} value={tab} onChange={setTab} />
+        {readOnly && onEdit && (
+          <button
+            type="button"
+            onClick={onEdit}
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-black/12 px-3 text-sm text-black"
+          >
+            <Pencil className="size-4" />
+            Edit Details
+          </button>
+        )}
       </div>
 
       {tab === 'personal' && (
@@ -371,7 +387,7 @@ export function UserDetailsForm({
           <TableFrame>
             <PaymentTable
               rows={payments.data?.data ?? []}
-              onView={(row) => navigate(`/payments?view=${row.id}`)}
+              onView={setViewPay}
               nameHeader="Buyer Name"
             />
             <Pagination

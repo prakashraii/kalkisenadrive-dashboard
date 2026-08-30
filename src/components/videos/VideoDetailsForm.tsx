@@ -63,14 +63,18 @@ function FilledSelect({
 export function VideoDetailsForm({
   videoId,
   onClose,
+  readOnly: startReadOnly = false,
+  onEdit,
 }: {
   videoId: string | 'new'
   onClose: () => void
+  readOnly?: boolean
+  onEdit?: () => void
 }) {
   const mut = useAdminMutation(['videos'])
   const [params, setParams] = useSearchParams()
   const isNew = videoId === 'new'
-  const [editing, setEditing] = useState(isNew)
+  const [editing, setEditing] = useState(isNew || !startReadOnly)
   const [file, setFile] = useState<File | null>(null)
   const [filePreview, setFilePreview] = useState('')
   const [error, setError] = useState('')
@@ -180,7 +184,7 @@ export function VideoDetailsForm({
         {!isNew && (
           <button
             type="button"
-            onClick={() => setEditing(true)}
+            onClick={() => (onEdit ? onEdit() : setEditing(true))}
             disabled={editing}
             className="inline-flex h-10 items-center gap-2 rounded-md border border-black/12 px-3 text-sm text-black disabled:opacity-50"
           >
