@@ -4,10 +4,9 @@ import { useQuery } from '@tanstack/react-query'
 import { BookOpen, Building2, CarFront, HeartHandshake, Plus, Users } from 'lucide-react'
 import { api, type PaymentRow } from '../lib/api'
 import { countryName, flagEmoji } from '../lib/cn'
-import { ActionButtons, Modal } from '../components/ui/Actions'
+import { ActionButtons } from '../components/ui/Actions'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { DataTable, TableFrame } from '../components/ui/DataTable'
-import { DetailList } from '../components/ui/DetailList'
 import { MetricCard } from '../components/ui/MetricCard'
 import { Pagination } from '../components/ui/Pagination'
 import { PaymentTable } from '../components/ui/PaymentTable'
@@ -80,7 +79,6 @@ export function UsersPage() {
   const [edit, setEdit] = useState<User | 'new' | null>(null)
   const [formMode, setFormMode] = useState<'new' | 'edit' | 'view'>('edit')
   const [del, setDel] = useState<User | null>(null)
-  const [view, setView] = useState<PaymentRow | Driver | Order | null>(null)
 
   function openForm(next: User | 'new', mode: 'new' | 'edit' | 'view' = next === 'new' ? 'new' : 'edit') {
     setEdit(next)
@@ -93,21 +91,25 @@ export function UsersPage() {
   }
 
   function openPaymentUser(row: PaymentRow) {
-    if (!row.userId) {
-      setView(row)
+    if (row.userId) {
+      openUserView({
+        id: row.userId,
+        publicId: row.publicId,
+        memberCode: row.memberId,
+        name: row.userName,
+        email: row.email,
+        phone: row.phone,
+        countryCode: row.countryCode,
+        city: row.city,
+        status: row.status,
+      })
       return
     }
-    openUserView({
-      id: row.userId,
-      publicId: row.publicId,
-      memberCode: row.memberId,
-      name: row.userName,
-      email: row.email,
-      phone: row.phone,
-      countryCode: row.countryCode,
-      city: row.city,
-      status: row.status,
-    })
+    if (tab === 'members') {
+      navigate(`/memberships?view=${row.id}`)
+      return
+    }
+    if (row.donationId) navigate(`/donations?view=${row.donationId}`)
   }
 
   function closeForm() {
@@ -256,7 +258,7 @@ export function UsersPage() {
                               city: d.city,
                               status: d.status,
                             })
-                          : setView(d)
+                          : navigate(`/drivers?view=${d.id}&tab=details`)
                       }
                     />
                   </td>
@@ -292,7 +294,7 @@ export function UsersPage() {
                               city: o.city,
                               status: o.status,
                             })
-                          : setView(o)
+                          : navigate(`/books/orders?view=${o.id}`)
                       }
                     />
                   </td>
@@ -310,27 +312,6 @@ export function UsersPage() {
         </TableFrame>
       </section>
 
-      <Modal title="Details" open={!!view} onClose={() => setView(null)}>
-        {view && 'userName' in view && 'amountCents' in view && (
-          <DetailList
-            items={[
-              { label: 'User', value: view.userName },
-              { label: 'Amount', value: String((view as PaymentRow).amountCents / 100) },
-              { label: 'Status', value: view.status },
-            ]}
-          />
-        )}
-        {view && 'licenseNumber' in view && (
-          <DetailList
-            items={[
-              { label: 'Name', value: (view as Driver).name },
-              { label: 'License', value: (view as Driver).licenseNumber },
-              { label: 'Vehicle', value: `${(view as Driver).vehicleType} ${(view as Driver).vehicleNumber}` },
-              { label: 'Status', value: view.status },
-            ]}
-          />
-        )}
-      </Modal>
       <ConfirmDialog
         open={!!del}
         title="Delete user"

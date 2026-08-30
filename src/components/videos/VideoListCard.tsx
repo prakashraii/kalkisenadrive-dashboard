@@ -1,4 +1,4 @@
-import { Copy, Globe, Link2, Lock, Share2, Upload } from 'lucide-react'
+import { Globe, Link2, Lock, Pencil, Share2, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '../../lib/cn'
 import { isUploadedVideo, mediaUrl, videoThumbnail } from '../../lib/media'
@@ -37,10 +37,12 @@ async function copyText(value: string, ok: string) {
 
 export function VideoListCard({
   video,
-  onOpen,
+  onEdit,
+  onDelete,
 }: {
   video: Video
-  onOpen: () => void
+  onEdit: () => void
+  onDelete: () => void
 }) {
   const fileUrl = isUploadedVideo(video.sourceUrl)
   const thumb = videoThumbnail(video)
@@ -67,7 +69,7 @@ export function VideoListCard({
     <article className="grid grid-cols-1 items-center gap-4 rounded-xl bg-white px-4 py-3.5 shadow-[0_1px_4px_rgba(0,0,0,0.06)] lg:grid-cols-[140px_minmax(0,1.4fr)_120px_100px_80px_56px_228px] lg:gap-5 lg:px-5">
       <button
         type="button"
-        onClick={onOpen}
+        onClick={onEdit}
         className="h-[86px] w-[140px] overflow-hidden rounded-lg bg-[#E5E5E5]"
       >
         {thumb ? (
@@ -82,7 +84,7 @@ export function VideoListCard({
       </button>
 
       <div className="min-w-0">
-        <button type="button" onClick={onOpen} className="block w-full text-left">
+        <button type="button" onClick={onEdit} className="block w-full text-left">
           <h3 className="truncate text-[15px] font-semibold text-black">{video.title}</h3>
         </button>
         {href ? (
@@ -135,26 +137,20 @@ export function VideoListCard({
           </button>
           <button
             type="button"
-            onClick={() => {
-              if (!href) {
-                toast.error('No video link')
-                return
-              }
-              void copyText(href, 'Link copied')
-            }}
+            onClick={onEdit}
             className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-black/15 bg-white text-xs text-black"
           >
-            <Copy className="size-3.5" />
-            Copy Link
+            <Pencil className="size-3.5" />
+            Edit
           </button>
         </div>
         <button
           type="button"
-          onClick={onOpen}
-          className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md bg-[#020B17] text-xs text-white"
+          onClick={onDelete}
+          className="inline-flex h-9 w-full items-center justify-center gap-1.5 rounded-md border border-rose-200 text-xs text-rose-600 hover:bg-rose-50"
         >
-          <Upload className="size-3.5" />
-          Upload Now
+          <Trash2 className="size-3.5" />
+          Delete
         </button>
       </div>
     </article>

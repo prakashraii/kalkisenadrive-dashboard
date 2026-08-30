@@ -111,16 +111,20 @@ const schema = Yup.object({
 export function BookDetailsForm({
   bookId,
   onClose,
+  readOnly: forceReadOnly = false,
+  onEdit,
 }: {
   bookId: string | 'new'
   onClose: () => void
+  readOnly?: boolean
+  onEdit?: () => void
 }) {
   const mut = useAdminMutation(['books', 'dashboard-summary'])
   const isNew = bookId === 'new'
-  const [editing, setEditing] = useState(isNew)
+  const [editing, setEditing] = useState(isNew || !forceReadOnly)
   const [step, setStep] = useState<'details' | 'chapters'>('details')
   const [chapterIndex, setChapterIndex] = useState(0)
-  const readOnly = !editing
+  const readOnly = forceReadOnly || !editing
 
   const { data: book } = useQuery({
     queryKey: ['book', bookId],
@@ -150,12 +154,11 @@ export function BookDetailsForm({
         <span className="inline-flex items-center rounded-md bg-[#E8F5E9] px-3 py-1.5 text-xs font-medium text-[#1B5E20]">
           2 year membership free
         </span>
-        {!isNew && (
+        {!isNew && readOnly && (
           <button
             type="button"
-            onClick={() => setEditing(true)}
-            disabled={editing}
-            className="inline-flex h-10 items-center gap-2 rounded-md border border-black/12 px-3 text-sm text-black disabled:opacity-50"
+            onClick={() => (onEdit ? onEdit() : setEditing(true))}
+            className="inline-flex h-10 items-center gap-2 rounded-md border border-black/12 px-3 text-sm text-black"
           >
             <Pencil className="size-4" />
             Edit Details

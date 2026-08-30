@@ -50,7 +50,7 @@ export function BookOrderDetailsForm({
   orderId: string
   onClose: () => void
 }) {
-  const mut = useAdminMutation(['book-orders'])
+  const mut = useAdminMutation(['book-orders', 'book-order'])
   const [cancelOpen, setCancelOpen] = useState(false)
   const { data: row } = useQuery({
     queryKey: ['book-order', orderId],

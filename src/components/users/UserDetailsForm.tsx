@@ -1,4 +1,5 @@
 import { useState, type ChangeEventHandler, type ReactNode } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { Formik } from 'formik'
 import { ChevronDown, Search } from 'lucide-react'
@@ -6,8 +7,6 @@ import * as Yup from 'yup'
 import { api, type Paginated, type PaymentRow } from '../../lib/api'
 import { cn, formatMoney } from '../../lib/cn'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
-import { Modal } from '../ui/Actions'
-import { DetailList } from '../ui/DetailList'
 import { Pagination } from '../ui/Pagination'
 import { PaymentTable } from '../ui/PaymentTable'
 import { TableFrame } from '../ui/DataTable'
@@ -115,6 +114,7 @@ export function UserDetailsForm({
   onClose: () => void
   readOnly?: boolean
 }) {
+  const navigate = useNavigate()
   const mut = useAdminMutation(['users', 'drivers', 'dashboard-summary'])
   const isNew = edit === 'new'
   const userId = isNew ? '' : edit.id
@@ -122,7 +122,6 @@ export function UserDetailsForm({
   const [payPage, setPayPage] = useState(1)
   const [paySearch, setPaySearch] = useState('')
   const [payMethod, setPayMethod] = useState<'WALLET' | 'BANK' | ''>('WALLET')
-  const [viewPay, setViewPay] = useState<PaymentRow | null>(null)
 
   const { data: details } = useQuery({
     queryKey: ['user-details', userId],
@@ -372,7 +371,7 @@ export function UserDetailsForm({
           <TableFrame>
             <PaymentTable
               rows={payments.data?.data ?? []}
-              onView={setViewPay}
+              onView={(row) => navigate(`/payments?view=${row.id}`)}
               nameHeader="Buyer Name"
             />
             <Pagination
@@ -420,18 +419,6 @@ export function UserDetailsForm({
         </div>
       )}
 
-      <Modal title="Payment" open={!!viewPay} onClose={() => setViewPay(null)}>
-        {viewPay && (
-          <DetailList
-            items={[
-              { label: 'Buyer', value: viewPay.userName },
-              { label: 'Amount', value: String(viewPay.amountCents / 100) },
-              { label: 'Trans. ID', value: viewPay.transId },
-              { label: 'Status', value: viewPay.status },
-            ]}
-          />
-        )}
-      </Modal>
     </div>
   )
 }

@@ -1,13 +1,16 @@
+import { useState } from 'react'
 import { BookOpen, Plus } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { BookDetailsForm, type Book } from '../components/books/BookDetailsForm'
 import { ActionButtons } from '../components/ui/Actions'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { DataTable, TableFrame } from '../components/ui/DataTable'
 import { Pagination } from '../components/ui/Pagination'
 import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableToolbar } from '../components/ui/TableToolbar'
+import { api } from '../lib/api'
 import { formatMoney } from '../lib/cn'
-import { useAdminList } from '../viewmodels/useAdminCrud'
+import { useAdminList, useAdminMutation } from '../viewmodels/useAdminCrud'
 
 const COLUMNS = ['Title', 'Author', 'Type', 'Price', 'Stock', 'Language', 'Status', 'Membership', 'Action']
 
@@ -22,13 +25,27 @@ export function BooksPage() {
   const viewId = params.get('view')
   const form = params.get('form')
   const list = useAdminList<Book>('books', '/admin/books')
+  const mut = useAdminMutation(['books', 'dashboard-summary'])
+  const [del, setDel] = useState<Book | null>(null)
 
   if (form === 'new') {
     return <BookDetailsForm bookId="new" onClose={() => setParams({})} />
   }
 
+  if (form) {
+    return <BookDetailsForm key={form} bookId={form} onClose={() => setParams({})} />
+  }
+
   if (viewId) {
-    return <BookDetailsForm bookId={viewId} onClose={() => setParams({})} />
+    return (
+      <BookDetailsForm
+        key={`view-${viewId}`}
+        bookId={viewId}
+        readOnly
+        onClose={() => setParams({})}
+        onEdit={() => setParams({ form: viewId })}
+      />
+    )
   }
 
   const total = list.data?.meta.total ?? 0
@@ -86,7 +103,11 @@ export function BooksPage() {
                   </span>
                 </td>
                 <td className="px-2.5 py-4">
-                  <ActionButtons onView={() => setParams({ view: b.id })} />
+                  <ActionButtons
+                    onView={() => setParams({ view: b.id })}
+                    onEdit={() => setParams({ form: b.id })}
+                    onDelete={() => setDel(b)}
+                  />
                 </td>
               </tr>
             ))}
@@ -100,6 +121,19 @@ export function BooksPage() {
           />
         </TableFrame>
       </section>
+
+      <ConfirmDialog
+        open={!!del}
+        title="Delete book"
+        message="Delete this book? This cannot be undone."
+        pending={mut.isPending}
+        onClose={() => setDel(null)}
+        onConfirm={async () => {
+          if (!del) return
+          await mut.mutateAsync(() => api.delete(`/admin/books/${del.id}`))
+          setDel(null)
+        }}
+      />
     </div>
   )
 }

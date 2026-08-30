@@ -108,7 +108,7 @@ export function PaymentsPage() {
                   <td className="px-2.5 py-4">{w.isDefault ? 'Yes' : 'No'}</td>
                   <td className="px-2.5 py-4">
                     <ActionButtons
-                      onView={() => setParams({ form: w.id, tab: 'wallet', type: 'wallet' })}
+                      onEdit={() => setParams({ form: w.id, tab: 'wallet', type: 'wallet' })}
                       onDelete={() => setDelWallet(w)}
                     />
                   </td>
@@ -125,7 +125,7 @@ export function PaymentsPage() {
                   <td className="px-2.5 py-4">{b.branch || '—'}</td>
                   <td className="px-2.5 py-4">{b.isDefault ? 'Yes' : 'No'}</td>
                   <td className="px-2.5 py-4">
-                    <ActionButtons onView={() => setParams({ form: b.id, tab: 'bank' })} onDelete={() => setDelBank(b)} />
+                    <ActionButtons onEdit={() => setParams({ form: b.id, tab: 'bank' })} onDelete={() => setDelBank(b)} />
                   </td>
                 </tr>
               ))}

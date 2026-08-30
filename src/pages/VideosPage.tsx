@@ -1,16 +1,21 @@
+import { useState } from 'react'
 import { Plus, Video as VideoIcon } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { VideoDetailsForm, type Video } from '../components/videos/VideoDetailsForm'
 import { VideoListCard } from '../components/videos/VideoListCard'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { Pagination } from '../components/ui/Pagination'
+import { api } from '../lib/api'
 import { isUploadedVideo } from '../lib/media'
-import { useAdminList } from '../viewmodels/useAdminCrud'
+import { useAdminList, useAdminMutation } from '../viewmodels/useAdminCrud'
 
 export function VideosPage() {
   const [params, setParams] = useSearchParams()
   const viewId = params.get('view')
   const form = params.get('form')
   const list = useAdminList<Video>('videos', '/admin/videos')
+  const mut = useAdminMutation(['videos'])
+  const [del, setDel] = useState<Video | null>(null)
 
   if (form === 'new') {
     return <VideoDetailsForm videoId="new" onClose={() => setParams({})} />
@@ -66,12 +71,13 @@ export function VideosPage() {
           <VideoListCard
             key={v.id}
             video={v}
-            onOpen={() =>
+            onEdit={() =>
               setParams({
                 view: v.id,
                 tab: isUploadedVideo(v.sourceUrl) ? 'video' : 'link',
               })
             }
+            onDelete={() => setDel(v)}
           />
         ))}
       </div>
@@ -85,6 +91,19 @@ export function VideosPage() {
           onPage={list.setPage}
         />
       </div>
+
+      <ConfirmDialog
+        open={!!del}
+        title="Delete video"
+        message="Delete this video? This cannot be undone."
+        pending={mut.isPending}
+        onClose={() => setDel(null)}
+        onConfirm={async () => {
+          if (!del) return
+          await mut.mutateAsync(() => api.delete(`/admin/videos/${del.id}`))
+          setDel(null)
+        }}
+      />
     </div>
   )
 }

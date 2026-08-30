@@ -1,8 +1,10 @@
+import { useState } from 'react'
 import { Building2, HeartHandshake, Link as LinkIcon, Plus, Users } from 'lucide-react'
 import { useSearchParams } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { ClinicDetailsForm, type Clinic } from '../components/clinics/ClinicDetailsForm'
 import { ActionButtons } from '../components/ui/Actions'
+import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { DataTable, TableFrame } from '../components/ui/DataTable'
 import { MetricCard } from '../components/ui/MetricCard'
 import { Pagination } from '../components/ui/Pagination'
@@ -10,7 +12,7 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { api } from '../lib/api'
 import { countryName, flagEmoji } from '../lib/cn'
-import { useAdminList } from '../viewmodels/useAdminCrud'
+import { useAdminList, useAdminMutation } from '../viewmodels/useAdminCrud'
 
 const COLUMNS = [
   'Clinic Registration ID',
@@ -34,6 +36,8 @@ export function ClinicsPage() {
   const viewId = params.get('view')
   const form = params.get('form')
   const list = useAdminList<Clinic>('clinics', '/admin/clinics')
+  const mut = useAdminMutation(['clinics', 'clinic-stats', 'dashboard-summary'])
+  const [del, setDel] = useState<Clinic | null>(null)
   const { data: stats } = useQuery({
     queryKey: ['clinic-stats'],
     queryFn: async () =>
@@ -45,8 +49,12 @@ export function ClinicsPage() {
     return <ClinicDetailsForm clinicId="new" onClose={() => setParams({})} />
   }
 
+  if (form) {
+    return <ClinicDetailsForm key={form} clinicId={form} onClose={() => setParams({})} />
+  }
+
   if (viewId) {
-    return <ClinicDetailsForm clinicId={viewId} onClose={() => setParams({})} />
+    return <ClinicDetailsForm key={`view-${viewId}`} clinicId={viewId} readOnly onClose={() => setParams({})} />
   }
 
   return (
@@ -128,7 +136,11 @@ export function ClinicsPage() {
                     <StatusBadge status={c.status === 'ACTIVE' ? 'APPROVED' : c.status} />
                   </td>
                   <td className="px-2.5 py-4">
-                    <ActionButtons onView={() => setParams({ view: c.id })} />
+                    <ActionButtons
+                      onView={() => setParams({ view: c.id })}
+                      onEdit={() => setParams({ form: c.id })}
+                      onDelete={() => setDel(c)}
+                    />
                   </td>
                 </tr>
               )
@@ -143,6 +155,19 @@ export function ClinicsPage() {
           />
         </TableFrame>
       </section>
+
+      <ConfirmDialog
+        open={!!del}
+        title="Delete clinic"
+        message="Delete this clinic? This cannot be undone."
+        pending={mut.isPending}
+        onClose={() => setDel(null)}
+        onConfirm={async () => {
+          if (!del) return
+          await mut.mutateAsync(() => api.delete(`/admin/clinics/${del.id}`))
+          setDel(null)
+        }}
+      />
     </div>
   )
 }
