@@ -1,11 +1,12 @@
 import { useQuery } from '@tanstack/react-query'
 import { Formik } from 'formik'
-import { ChevronDown, Pencil, Plus, Star, Trash2 } from 'lucide-react'
+import { ChevronDown, Pencil, Plus, Star } from 'lucide-react'
 import { useState, type ChangeEventHandler, type ReactNode } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import * as Yup from 'yup'
 import { api } from '../../lib/api'
-import { cn } from '../../lib/cn'
+import { cn, formatDate } from '../../lib/cn'
+import { mediaUrl } from '../../lib/media'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
 import { ImageUpload } from '../ui/ImageUpload'
 import { Tabs } from '../ui/Tabs'
@@ -42,10 +43,12 @@ export type BookChapter = {
 
 export type BookReview = {
   id?: string
+  userId?: string
   reviewerName: string
+  reviewerAvatarUrl?: string | null
   rating: number
   comment?: string | null
-  sortOrder?: number
+  createdAt?: string
 }
 
 export type Book = {
@@ -102,30 +105,14 @@ function FilledSelect({
   )
 }
 
-function StarRating({
-  value,
-  onChange,
-  disabled,
-}: {
-  value: number
-  onChange?: (n: number) => void
-  disabled?: boolean
-}) {
+function StarRating({ value }: { value: number }) {
   return (
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map((n) => (
-        <button
+        <Star
           key={n}
-          type="button"
-          disabled={disabled}
-          onClick={() => onChange?.(n)}
-          className={cn('inline-flex size-8 items-center justify-center', !disabled && 'cursor-pointer')}
-          aria-label={`${n} star${n === 1 ? '' : 's'}`}
-        >
-          <Star
-            className={cn('size-5', n <= Math.round(value) ? 'fill-amber-400 text-amber-400' : 'text-black/20')}
-          />
-        </button>
+          className={cn('size-5', n <= Math.round(value) ? 'fill-amber-400 text-amber-400' : 'text-black/20')}
+        />
       ))}
       <span className="ml-1 text-sm text-[#262626]">{value ? Number(value).toFixed(1) : '0.0'}</span>
     </div>
@@ -141,12 +128,6 @@ const emptyChapter = (chapterNo: number, language: string): BookChapter => ({
   sortOrder: chapterNo - 1,
 })
 
-const emptyReview = (): BookReview => ({
-  reviewerName: '',
-  rating: 5,
-  comment: '',
-})
-
 const schema = Yup.object({
   title: Yup.string().required('Required'),
   author: Yup.string().required('Required'),
@@ -159,7 +140,6 @@ const schema = Yup.object({
   status: Yup.string().required(),
   coverUrl: Yup.string(),
   authorPhotoUrl: Yup.string(),
-  rating: Yup.number().min(0).max(5),
   chapters: Yup.array().of(
     Yup.object({
       chapterNo: Yup.number().min(1).required(),
@@ -167,13 +147,6 @@ const schema = Yup.object({
       content: Yup.string(),
       contentUrl: Yup.string(),
       language: Yup.string(),
-    }),
-  ),
-  reviews: Yup.array().of(
-    Yup.object({
-      reviewerName: Yup.string(),
-      rating: Yup.number().min(1).max(5),
-      comment: Yup.string(),
     }),
   ),
 })
@@ -223,9 +196,7 @@ export function BookDetailsForm({
     language: book?.language ?? 'en',
     status: book?.status ?? 'AVAILABLE',
     coverUrl: book?.coverUrl ?? '',
-    rating: book?.rating ?? 0,
     chapters: initialChapters,
-    reviews: book?.reviews ?? [],
   }
 
   return (
@@ -270,14 +241,6 @@ export function BookDetailsForm({
               language: c.language || values.language,
               sortOrder: i,
             }))
-          const reviews = values.reviews
-            .filter((r) => r.reviewerName.trim())
-            .map((r, i) => ({
-              reviewerName: r.reviewerName.trim(),
-              rating: Number(r.rating) || 5,
-              comment: r.comment?.trim() || undefined,
-              sortOrder: i,
-            }))
           const payload = {
             title: values.title,
             author: values.author,
@@ -290,9 +253,7 @@ export function BookDetailsForm({
             language: values.language,
             status: values.status,
             coverUrl: values.coverUrl || undefined,
-            rating: Number(values.rating) || 0,
             chapters,
-            reviews,
           }
           try {
             if (isNew) {
@@ -316,16 +277,12 @@ export function BookDetailsForm({
           const chapters = fk.values.chapters
           const safeIndex = Math.min(chapterIndex, Math.max(0, chapters.length - 1))
           const chapter = chapters[safeIndex] ?? emptyChapter(1, fk.values.language)
-          const reviews = fk.values.reviews
+          const reviews = book?.reviews ?? []
+          const ratingAvg = book?.ratingAvg ?? book?.rating ?? 0
 
           function setChapter(patch: Partial<BookChapter>) {
             const next = chapters.map((c, i) => (i === safeIndex ? { ...c, ...patch } : c))
             void fk.setFieldValue('chapters', next)
-          }
-
-          function setReview(index: number, patch: Partial<BookReview>) {
-            const next = reviews.map((r, i) => (i === index ? { ...r, ...patch } : r))
-            void fk.setFieldValue('reviews', next)
           }
 
           return (
@@ -370,11 +327,7 @@ export function BookDetailsForm({
                           <p className="mt-1 text-xs text-rose-600">{fk.errors.author}</p>
                         )}
                         <div className="mt-2">
-                          <StarRating
-                            value={Number(fk.values.rating) || 0}
-                            onChange={(n) => void fk.setFieldValue('rating', n)}
-                            disabled={readOnly}
-                          />
+                          <StarRating value={Number(ratingAvg) || 0} />
                         </div>
                       </div>
                     </div>
@@ -538,59 +491,36 @@ export function BookDetailsForm({
                       </p>
                     )}
                     {reviews.map((review, index) => (
-                      <div key={review.id ?? index} className="rounded-lg border border-black/8 p-4">
+                      <div key={review.id ?? index} className="rounded-lg border border-black/8 p-3">
                         <div className="flex items-start gap-3">
-                          <div className="min-w-0 flex-1 space-y-3">
-                            <input
-                              value={review.reviewerName}
-                              onChange={(e) => setReview(index, { reviewerName: e.target.value })}
-                              readOnly={readOnly}
-                              placeholder="Reviewer name"
-                              className={fieldClass}
+                          {review.reviewerAvatarUrl ? (
+                            <img
+                              src={mediaUrl(review.reviewerAvatarUrl)}
+                              alt=""
+                              className="size-9 shrink-0 rounded-full object-cover"
                             />
-                            <StarRating
-                              value={review.rating}
-                              onChange={(n) => setReview(index, { rating: n })}
-                              disabled={readOnly}
-                            />
-                            <textarea
-                              value={review.comment ?? ''}
-                              onChange={(e) => setReview(index, { comment: e.target.value })}
-                              readOnly={readOnly}
-                              placeholder="Review"
-                              className={cn(textareaClass, 'min-h-[88px]')}
-                            />
-                          </div>
-                          {!readOnly && (
-                            <button
-                              type="button"
-                              onClick={() =>
-                                void fk.setFieldValue(
-                                  'reviews',
-                                  reviews.filter((_, i) => i !== index),
-                                )
-                              }
-                              className="inline-flex size-9 items-center justify-center rounded-md border border-black/12 text-black"
-                              aria-label="Remove review"
-                            >
-                              <Trash2 className="size-4" />
-                            </button>
+                          ) : (
+                            <span className="inline-flex size-9 shrink-0 items-center justify-center rounded-full bg-[#E5E5E5] text-xs font-medium text-[#262626]/70">
+                              {(review.reviewerName || '?').slice(0, 1).toUpperCase()}
+                            </span>
                           )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <p className="truncate text-sm font-medium text-[#262626]">{review.reviewerName}</p>
+                              {review.createdAt && (
+                                <span className="shrink-0 text-xs text-[#262626]/50">{formatDate(review.createdAt)}</span>
+                              )}
+                            </div>
+                            <div className="mt-1">
+                              <StarRating value={review.rating} />
+                            </div>
+                            {review.comment ? (
+                              <p className="mt-1.5 text-sm text-[#262626]/80">{review.comment}</p>
+                            ) : null}
+                          </div>
                         </div>
                       </div>
                     ))}
-                    {!readOnly && (
-                      <div className="flex justify-end">
-                        <button
-                          type="button"
-                          onClick={() => void fk.setFieldValue('reviews', [...reviews, emptyReview()])}
-                          className="inline-flex h-11 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white"
-                        >
-                          <Plus className="size-4" />
-                          Add Review
-                        </button>
-                      </div>
-                    )}
                   </div>
                 )}
 
