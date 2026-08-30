@@ -1,4 +1,4 @@
-import { BookOpen, Plus } from 'lucide-react'
+import { BookOpen, Plus, Star } from 'lucide-react'
 import { useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { BookDetailsForm, type Book } from '../components/books/BookDetailsForm'
@@ -10,9 +10,10 @@ import { StatusBadge } from '../components/ui/StatusBadge'
 import { TableToolbar } from '../components/ui/TableToolbar'
 import { api } from '../lib/api'
 import { formatMoney } from '../lib/cn'
+import { mediaUrl } from '../lib/media'
 import { useAdminList, useAdminMutation } from '../viewmodels/useAdminCrud'
 
-const COLUMNS = ['Title', 'Author', 'Type', 'Price', 'Stock', 'Language', 'Status', 'Membership', 'Action']
+const COLUMNS = ['Title', 'Author', 'Rating', 'Type', 'Price', 'Stock', 'Language', 'Status', 'Membership', 'Action']
 
 const LANGUAGE_LABEL: Record<string, string> = {
   en: 'English',
@@ -42,7 +43,12 @@ export function BooksPage() {
         bookId={viewId}
         readOnly
         onClose={() => setParams({})}
-        onEdit={() => setParams({ form: viewId })}
+        onEdit={() =>
+          setParams({
+            form: viewId,
+            tab: params.get('tab') || 'about',
+          })
+        }
       />
     )
   }
@@ -88,7 +94,31 @@ export function BooksPage() {
             {(list.data?.data ?? []).map((b) => (
               <tr key={b.id} className="text-[#262626]">
                 <td className="px-2.5 py-4 font-medium">{b.title}</td>
-                <td className="px-2.5 py-4">{b.author}</td>
+                <td className="px-2.5 py-4">
+                  <div className="flex items-center gap-2">
+                    {b.authorPhotoUrl ? (
+                      <img
+                        src={mediaUrl(b.authorPhotoUrl)}
+                        alt=""
+                        className="size-7 shrink-0 rounded-full object-cover"
+                      />
+                    ) : (
+                      <span className="inline-flex size-7 shrink-0 items-center justify-center rounded-full bg-[#E5E5E5] text-[10px] font-medium text-[#262626]/70">
+                        {b.author.slice(0, 1).toUpperCase()}
+                      </span>
+                    )}
+                    <span>{b.author}</span>
+                  </div>
+                </td>
+                <td className="px-2.5 py-4">
+                  <span className="inline-flex items-center gap-1 text-sm">
+                    <Star className="size-3.5 fill-amber-400 text-amber-400" />
+                    {(b.ratingAvg ?? b.rating ?? 0).toFixed(1)}
+                    {b.reviewCount ? (
+                      <span className="text-[#262626]/50">({b.reviewCount})</span>
+                    ) : null}
+                  </span>
+                </td>
                 <td className="px-2.5 py-4">{b.type === 'DIGITAL' ? 'Digital' : 'Physical'}</td>
                 <td className="px-2.5 py-4">{formatMoney(b.priceCents)}</td>
                 <td className="px-2.5 py-4">{b.stock}</td>

@@ -15,6 +15,7 @@ export function ImageUpload({
   label = 'Drop image or click to upload',
   folder,
   className,
+  shape = 'rounded',
 }: {
   value?: string
   onChange: (url: string) => void
@@ -22,6 +23,7 @@ export function ImageUpload({
   label?: string
   folder?: string
   className?: string
+  shape?: 'rounded' | 'circle'
 }) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
@@ -86,7 +88,8 @@ export function ImageUpload({
         inputRef.current?.click()
       }}
       className={cn(
-        'relative flex min-h-[220px] w-full flex-1 cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-[#E5E5E5]',
+        'relative flex min-h-[220px] w-full flex-1 cursor-pointer items-center justify-center overflow-hidden bg-[#E5E5E5]',
+        shape === 'circle' ? 'rounded-full' : 'rounded-lg',
         disabled && 'cursor-default',
         className,
       )}
@@ -104,7 +107,24 @@ export function ImageUpload({
       ) : (
         <span className="px-4 text-center text-sm text-[#262626]/70">{busy ? 'Uploading…' : label}</span>
       )}
-      {!disabled && (
+      {!disabled && shape === 'circle' && value && (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => {
+            setLocalPreview((prev) => {
+              if (prev) URL.revokeObjectURL(prev)
+              return ''
+            })
+            onChange('')
+          }}
+          className="absolute right-1 top-1 inline-flex size-7 items-center justify-center rounded-full border border-black/12 bg-white text-black disabled:opacity-60"
+          aria-label="Remove image"
+        >
+          <X className="size-3.5" />
+        </button>
+      )}
+      {!disabled && shape !== 'circle' && (
         <div className="absolute inset-x-3 bottom-3 flex items-center justify-center gap-2">
           <button
             type="button"

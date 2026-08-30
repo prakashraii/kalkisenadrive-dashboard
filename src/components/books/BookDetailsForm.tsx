@@ -1,23 +1,33 @@
 import { useQuery } from '@tanstack/react-query'
 import { Formik } from 'formik'
-import { ChevronDown, Pencil, Plus } from 'lucide-react'
+import { ChevronDown, Pencil, Plus, Star, Trash2 } from 'lucide-react'
 import { useState, type ChangeEventHandler, type ReactNode } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import * as Yup from 'yup'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
 import { ImageUpload } from '../ui/ImageUpload'
+import { Tabs } from '../ui/Tabs'
 
 const fieldClass =
   'h-11 w-full rounded-lg bg-[#E5E5E5] px-4 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
 
 const textareaClass =
-  'min-h-[160px] w-full resize-none rounded-lg bg-[#E5E5E5] px-4 py-3 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
+  'min-h-[140px] w-full resize-none rounded-lg bg-[#E5E5E5] px-4 py-3 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
 
 const LANGUAGES = [
   { value: 'en', label: 'English' },
   { value: 'np', label: 'Nepali' },
   { value: 'hi', label: 'Hindi' },
+]
+
+type FormTab = 'about' | 'chapter' | 'reviews'
+
+const FORM_TABS: { id: FormTab; label: string }[] = [
+  { id: 'about', label: 'About' },
+  { id: 'chapter', label: 'Chapter' },
+  { id: 'reviews', label: 'Reviews' },
 ]
 
 export type BookChapter = {
@@ -30,10 +40,19 @@ export type BookChapter = {
   sortOrder?: number
 }
 
+export type BookReview = {
+  id?: string
+  reviewerName: string
+  rating: number
+  comment?: string | null
+  sortOrder?: number
+}
+
 export type Book = {
   id: string
   title: string
   author: string
+  authorPhotoUrl?: string | null
   coverUrl?: string | null
   priceCents: number
   stock: number
@@ -42,8 +61,16 @@ export type Book = {
   shortDetails?: string | null
   language: string
   status: string
+  rating?: number
+  ratingAvg?: number
+  reviewCount?: number
   membershipBonus?: string
   chapters?: BookChapter[]
+  reviews?: BookReview[]
+}
+
+function tabFromParam(value: string | null): FormTab {
+  return FORM_TABS.some((t) => t.id === value) ? (value as FormTab) : 'about'
 }
 
 function FilledSelect({
@@ -75,6 +102,36 @@ function FilledSelect({
   )
 }
 
+function StarRating({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number
+  onChange?: (n: number) => void
+  disabled?: boolean
+}) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {[1, 2, 3, 4, 5].map((n) => (
+        <button
+          key={n}
+          type="button"
+          disabled={disabled}
+          onClick={() => onChange?.(n)}
+          className={cn('inline-flex size-8 items-center justify-center', !disabled && 'cursor-pointer')}
+          aria-label={`${n} star${n === 1 ? '' : 's'}`}
+        >
+          <Star
+            className={cn('size-5', n <= Math.round(value) ? 'fill-amber-400 text-amber-400' : 'text-black/20')}
+          />
+        </button>
+      ))}
+      <span className="ml-1 text-sm text-[#262626]">{value ? Number(value).toFixed(1) : '0.0'}</span>
+    </div>
+  )
+}
+
 const emptyChapter = (chapterNo: number, language: string): BookChapter => ({
   chapterNo,
   title: '',
@@ -82,6 +139,12 @@ const emptyChapter = (chapterNo: number, language: string): BookChapter => ({
   contentUrl: '',
   language,
   sortOrder: chapterNo - 1,
+})
+
+const emptyReview = (): BookReview => ({
+  reviewerName: '',
+  rating: 5,
+  comment: '',
 })
 
 const schema = Yup.object({
@@ -95,6 +158,8 @@ const schema = Yup.object({
   language: Yup.string().required(),
   status: Yup.string().required(),
   coverUrl: Yup.string(),
+  authorPhotoUrl: Yup.string(),
+  rating: Yup.number().min(0).max(5),
   chapters: Yup.array().of(
     Yup.object({
       chapterNo: Yup.number().min(1).required(),
@@ -102,6 +167,13 @@ const schema = Yup.object({
       content: Yup.string(),
       contentUrl: Yup.string(),
       language: Yup.string(),
+    }),
+  ),
+  reviews: Yup.array().of(
+    Yup.object({
+      reviewerName: Yup.string(),
+      rating: Yup.number().min(1).max(5),
+      comment: Yup.string(),
     }),
   ),
 })
@@ -117,10 +189,11 @@ export function BookDetailsForm({
   readOnly?: boolean
   onEdit?: () => void
 }) {
-  const mut = useAdminMutation(['books', 'dashboard-summary'])
+  const [params, setParams] = useSearchParams()
+  const tab = tabFromParam(params.get('tab'))
+  const mut = useAdminMutation(['books', 'book', 'dashboard-summary'])
   const isNew = bookId === 'new'
   const [editing, setEditing] = useState(isNew || !startReadOnly)
-  const [step, setStep] = useState<'details' | 'chapters'>('details')
   const [chapterIndex, setChapterIndex] = useState(0)
   const readOnly = !editing
 
@@ -130,11 +203,18 @@ export function BookDetailsForm({
     enabled: !isNew,
   })
 
+  function setTab(next: FormTab) {
+    const nextParams = new URLSearchParams(params)
+    nextParams.set('tab', next)
+    setParams(nextParams, { replace: true })
+  }
+
   const initialChapters = book?.chapters?.length ? book.chapters : [emptyChapter(1, book?.language ?? 'en')]
 
   const initialValues = {
     title: book?.title ?? '',
     author: book?.author ?? '',
+    authorPhotoUrl: book?.authorPhotoUrl ?? '',
     price: book ? book.priceCents / 100 : 0,
     stock: book?.stock ?? 0,
     type: book?.type ?? 'PHYSICAL',
@@ -143,7 +223,9 @@ export function BookDetailsForm({
     language: book?.language ?? 'en',
     status: book?.status ?? 'AVAILABLE',
     coverUrl: book?.coverUrl ?? '',
+    rating: book?.rating ?? 0,
     chapters: initialChapters,
+    reviews: book?.reviews ?? [],
   }
 
   return (
@@ -165,6 +247,10 @@ export function BookDetailsForm({
         )}
       </div>
 
+      <div className="mb-6">
+        <Tabs tabs={FORM_TABS} value={tab} onChange={setTab} />
+      </div>
+
       <Formik
         enableReinitialize
         initialValues={initialValues}
@@ -184,9 +270,18 @@ export function BookDetailsForm({
               language: c.language || values.language,
               sortOrder: i,
             }))
+          const reviews = values.reviews
+            .filter((r) => r.reviewerName.trim())
+            .map((r, i) => ({
+              reviewerName: r.reviewerName.trim(),
+              rating: Number(r.rating) || 5,
+              comment: r.comment?.trim() || undefined,
+              sortOrder: i,
+            }))
           const payload = {
             title: values.title,
             author: values.author,
+            authorPhotoUrl: values.authorPhotoUrl || undefined,
             priceCents: Math.round(Number(values.price) * 100),
             stock: Number(values.stock),
             type: values.type,
@@ -195,7 +290,9 @@ export function BookDetailsForm({
             language: values.language,
             status: values.status,
             coverUrl: values.coverUrl || undefined,
+            rating: Number(values.rating) || 0,
             chapters,
+            reviews,
           }
           try {
             if (isNew) {
@@ -219,25 +316,23 @@ export function BookDetailsForm({
           const chapters = fk.values.chapters
           const safeIndex = Math.min(chapterIndex, Math.max(0, chapters.length - 1))
           const chapter = chapters[safeIndex] ?? emptyChapter(1, fk.values.language)
+          const reviews = fk.values.reviews
 
           function setChapter(patch: Partial<BookChapter>) {
             const next = chapters.map((c, i) => (i === safeIndex ? { ...c, ...patch } : c))
             void fk.setFieldValue('chapters', next)
           }
 
+          function setReview(index: number, patch: Partial<BookReview>) {
+            const next = reviews.map((r, i) => (i === index ? { ...r, ...patch } : r))
+            void fk.setFieldValue('reviews', next)
+          }
+
           return (
             <form onSubmit={fk.handleSubmit} className="max-w-6xl">
-              {step === 'chapters' && (
-                <div className="mb-6">
-                  <span className="inline-flex h-10 items-center rounded-md bg-[#020B17] px-4 text-sm text-white">
-                    Chapter Details
-                  </span>
-                </div>
-              )}
-
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.7fr)]">
-                {step === 'details' ? (
-                  <div className="flex flex-col gap-6">
+                {tab === 'about' && (
+                  <div className="flex flex-col gap-5">
                     <div>
                       <input
                         name="title"
@@ -252,8 +347,17 @@ export function BookDetailsForm({
                       )}
                     </div>
 
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                      <div>
+                    <div className="flex items-center gap-4">
+                      <ImageUpload
+                        value={fk.values.authorPhotoUrl}
+                        onChange={(url) => void fk.setFieldValue('authorPhotoUrl', url)}
+                        disabled={readOnly}
+                        folder="books"
+                        label="Photo"
+                        shape="circle"
+                        className="size-[88px] min-h-[88px] max-w-[88px] flex-none"
+                      />
+                      <div className="min-w-0 flex-1">
                         <input
                           name="author"
                           value={fk.values.author}
@@ -265,7 +369,17 @@ export function BookDetailsForm({
                         {fk.touched.author && fk.errors.author && (
                           <p className="mt-1 text-xs text-rose-600">{fk.errors.author}</p>
                         )}
+                        <div className="mt-2">
+                          <StarRating
+                            value={Number(fk.values.rating) || 0}
+                            onChange={(n) => void fk.setFieldValue('rating', n)}
+                            disabled={readOnly}
+                          />
+                        </div>
                       </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                       <FilledSelect
                         name="type"
                         value={fk.values.type}
@@ -275,9 +389,6 @@ export function BookDetailsForm({
                         <option value="PHYSICAL">Physical</option>
                         <option value="DIGITAL">Digital</option>
                       </FilledSelect>
-                    </div>
-
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                       <input
                         type="number"
                         name="price"
@@ -288,6 +399,9 @@ export function BookDetailsForm({
                         placeholder="Price"
                         className={fieldClass}
                       />
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                       <input
                         type="number"
                         name="stock"
@@ -298,37 +412,6 @@ export function BookDetailsForm({
                         placeholder="Stock"
                         className={fieldClass}
                       />
-                    </div>
-
-                    <textarea
-                      name="description"
-                      value={fk.values.description}
-                      onChange={fk.handleChange}
-                      readOnly={readOnly}
-                      placeholder="Description"
-                      className={textareaClass}
-                    />
-
-                    <textarea
-                      name="shortDetails"
-                      value={fk.values.shortDetails}
-                      onChange={fk.handleChange}
-                      readOnly={readOnly}
-                      placeholder="Short details"
-                      className={textareaClass}
-                    />
-
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                      <FilledSelect
-                        name="status"
-                        value={fk.values.status}
-                        onChange={fk.handleChange}
-                        disabled={readOnly}
-                      >
-                        <option value="AVAILABLE">Available</option>
-                        <option value="OUT_OF_STOCK">Out of stock</option>
-                        <option value="INACTIVE">Inactive</option>
-                      </FilledSelect>
                       <FilledSelect
                         name="language"
                         value={fk.values.language}
@@ -343,26 +426,40 @@ export function BookDetailsForm({
                       </FilledSelect>
                     </div>
 
-                    <div className="flex justify-center">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (!fk.values.title || !fk.values.author) {
-                            void fk.setTouched({ title: true, author: true })
-                            return
-                          }
-                          setStep('chapters')
-                        }}
-                        className="inline-flex h-11 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white"
-                      >
-                        <Plus className="size-4" />
-                        Add Details
-                      </button>
-                    </div>
+                    <textarea
+                      name="description"
+                      value={fk.values.description}
+                      onChange={fk.handleChange}
+                      readOnly={readOnly}
+                      placeholder="About this book"
+                      className={cn(textareaClass, 'min-h-[160px]')}
+                    />
+
+                    <textarea
+                      name="shortDetails"
+                      value={fk.values.shortDetails}
+                      onChange={fk.handleChange}
+                      readOnly={readOnly}
+                      placeholder="Short details"
+                      className={textareaClass}
+                    />
+
+                    <FilledSelect
+                      name="status"
+                      value={fk.values.status}
+                      onChange={fk.handleChange}
+                      disabled={readOnly}
+                    >
+                      <option value="AVAILABLE">Available</option>
+                      <option value="OUT_OF_STOCK">Out of stock</option>
+                      <option value="INACTIVE">Inactive</option>
+                    </FilledSelect>
                   </div>
-                ) : (
-                  <div className="flex flex-col gap-6">
-                    <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                )}
+
+                {tab === 'chapter' && (
+                  <div className="flex flex-col gap-5">
+                    <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                       <FilledSelect
                         name={`chapters.${safeIndex}.chapterNo`}
                         value={String(chapter.chapterNo)}
@@ -433,16 +530,71 @@ export function BookDetailsForm({
                   </div>
                 )}
 
-                {step === 'details' ? (
-                  <ImageUpload
-                    value={fk.values.coverUrl}
-                    onChange={(url) => void fk.setFieldValue('coverUrl', url)}
-                    disabled={readOnly}
-                    folder="books"
-                    label="Cover image"
-                    className="min-h-[420px]"
-                  />
-                ) : (
+                {tab === 'reviews' && (
+                  <div className="flex flex-col gap-4">
+                    {reviews.length === 0 && (
+                      <p className="rounded-lg bg-[#F5F5F5] px-4 py-6 text-center text-sm text-[#262626]/70">
+                        No reviews yet.
+                      </p>
+                    )}
+                    {reviews.map((review, index) => (
+                      <div key={review.id ?? index} className="rounded-lg border border-black/8 p-4">
+                        <div className="flex items-start gap-3">
+                          <div className="min-w-0 flex-1 space-y-3">
+                            <input
+                              value={review.reviewerName}
+                              onChange={(e) => setReview(index, { reviewerName: e.target.value })}
+                              readOnly={readOnly}
+                              placeholder="Reviewer name"
+                              className={fieldClass}
+                            />
+                            <StarRating
+                              value={review.rating}
+                              onChange={(n) => setReview(index, { rating: n })}
+                              disabled={readOnly}
+                            />
+                            <textarea
+                              value={review.comment ?? ''}
+                              onChange={(e) => setReview(index, { comment: e.target.value })}
+                              readOnly={readOnly}
+                              placeholder="Review"
+                              className={cn(textareaClass, 'min-h-[88px]')}
+                            />
+                          </div>
+                          {!readOnly && (
+                            <button
+                              type="button"
+                              onClick={() =>
+                                void fk.setFieldValue(
+                                  'reviews',
+                                  reviews.filter((_, i) => i !== index),
+                                )
+                              }
+                              className="inline-flex size-9 items-center justify-center rounded-md border border-black/12 text-black"
+                              aria-label="Remove review"
+                            >
+                              <Trash2 className="size-4" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    {!readOnly && (
+                      <div className="flex justify-end">
+                        <button
+                          type="button"
+                          onClick={() => void fk.setFieldValue('reviews', [...reviews, emptyReview()])}
+                          className="inline-flex h-11 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white"
+                        >
+                          <Plus className="size-4" />
+                          Add Review
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {tab === 'chapter' ? (
                   <ImageUpload
                     value={chapter.contentUrl ?? ''}
                     onChange={(url) => setChapter({ contentUrl: url })}
@@ -451,16 +603,22 @@ export function BookDetailsForm({
                     label="Chapter image"
                     className="min-h-[420px]"
                   />
+                ) : (
+                  <ImageUpload
+                    value={fk.values.coverUrl}
+                    onChange={(url) => void fk.setFieldValue('coverUrl', url)}
+                    disabled={readOnly}
+                    folder="books"
+                    label="Cover image"
+                    className="min-h-[420px]"
+                  />
                 )}
               </div>
 
               <div className="mt-8 flex justify-end gap-3">
                 <button
                   type="button"
-                  onClick={() => {
-                    if (step === 'chapters') setStep('details')
-                    else onClose()
-                  }}
+                  onClick={onClose}
                   className="h-11 rounded-md border border-black/12 px-6 text-sm text-black"
                 >
                   Back
@@ -471,7 +629,7 @@ export function BookDetailsForm({
                     disabled={fk.isSubmitting}
                     className="h-11 rounded-md bg-[#001E5E] px-6 text-sm font-medium text-white disabled:opacity-60"
                   >
-                    {fk.isSubmitting ? 'Saving…' : step === 'chapters' ? 'Upload' : 'Save'}
+                    {fk.isSubmitting ? 'Saving…' : isNew ? 'Upload' : 'Save'}
                   </button>
                 )}
               </div>
