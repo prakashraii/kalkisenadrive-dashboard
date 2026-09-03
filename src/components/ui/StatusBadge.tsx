@@ -14,6 +14,7 @@ const styles: Record<string, string> = {
   OUT_OF_STOCK: 'text-rose-600',
   SENT: 'text-[#34C759]',
   DRAFT: 'text-slate-500',
+  SCHEDULED: 'text-sky-600',
   EXPIRED: 'text-slate-500',
 }
 

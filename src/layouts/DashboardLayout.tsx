@@ -39,7 +39,7 @@ const nav = [
   },
   { to: '/videos', label: 'Video', icon: Video },
   { to: '/payments', label: 'Manage Accounts', icon: CreditCard },
-  { to: '/notifications', label: 'Push Notification', icon: Bell },
+  { to: '/notifications', label: 'Notification', icon: Bell },
 ]
 
 const titles: Record<string, string> = {
@@ -53,7 +53,7 @@ const titles: Record<string, string> = {
   '/books/orders': 'Book Orders',
   '/videos': 'Video List',
   '/payments': 'Manage Accounts',
-  '/notifications': 'Push Notification',
+  '/notifications': 'Notification',
 }
 
 export function DashboardLayout() {
@@ -148,6 +148,8 @@ export function DashboardLayout() {
         ? 'Video Details'
         : 'Video List'
     : null
+  const notificationForm = location.pathname === '/notifications' && formMode === 'new'
+  const notificationTitle = notificationForm ? 'Send Notification' : null
   const paymentForm = location.pathname === '/payments' && formMode
   const paymentView = location.pathname === '/payments' && params.get('view')
   const paymentWallet = params.get('type') === 'wallet'
@@ -162,7 +164,7 @@ export function DashboardLayout() {
         ? 'Payment Details'
         : 'Manage Accounts'
     : null
-  const detailTitle = formTitle ?? donationTitle ?? membershipTitle ?? clinicTitle ?? bookTitle ?? orderTitle ?? driverTitle ?? videoTitle ?? paymentTitle
+  const detailTitle = formTitle ?? donationTitle ?? membershipTitle ?? clinicTitle ?? bookTitle ?? orderTitle ?? driverTitle ?? videoTitle ?? paymentTitle ?? notificationTitle
   const title = detailTitle ?? titles[location.pathname] ?? 'Dashboard'
   const crumb = formTitle ? (
     <>
@@ -214,6 +216,10 @@ export function DashboardLayout() {
   ) : paymentView ? (
     <>
       Menu / Manage Accounts / <span className="text-[#7EB6FF]">Payment Details</span>
+    </>
+  ) : notificationForm ? (
+    <>
+      Menu / Notification / <span className="text-[#7EB6FF]">Send Notification</span>
     </>
   ) : location.pathname === '/videos' && !videoForm ? (
     <>
