@@ -95,7 +95,7 @@ const fieldClass =
 
 const schema = Yup.object({
   name: Yup.string().required('Required'),
-  phone: Yup.string().required('Required'),
+  phone: Yup.string().matches(/^[0-9]{10}$/, '10-digit phone').required('Required'),
   email: Yup.string().email().nullable(),
   licenseNumber: Yup.string().required('Required'),
   vehicleType: Yup.string().required('Required'),
