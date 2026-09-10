@@ -8,6 +8,20 @@ export function useAdminList<T>(key: string, path: string, extra?: Record<string
   const [search, setSearch] = useState('')
   const [country, setCountry] = useState('')
   const [from, setFrom] = useState('')
+
+  function setSearchAndReset(value: string) {
+    setPage(1)
+    setSearch(value)
+  }
+  function setCountryAndReset(value: string) {
+    setPage(1)
+    setCountry(value)
+  }
+  function setFromAndReset(value: string) {
+    setPage(1)
+    setFrom(value)
+  }
+
   const params = useMemo(
     () => ({ page, limit: 10, search: search || undefined, country: country || undefined, from: from || undefined, ...extra }),
     [page, search, country, from, extra],
@@ -17,7 +31,17 @@ export function useAdminList<T>(key: string, path: string, extra?: Record<string
     queryFn: async () => (await api.get<Paginated<T>>(path, { params })).data,
     placeholderData: keepPreviousData,
   })
-  return { ...query, page, setPage, search, setSearch, country, setCountry, from, setFrom }
+  return {
+    ...query,
+    page,
+    setPage,
+    search,
+    setSearch: setSearchAndReset,
+    country,
+    setCountry: setCountryAndReset,
+    from,
+    setFrom: setFromAndReset,
+  }
 }
 
 export function useAdminMutation(invalidate: string[]) {

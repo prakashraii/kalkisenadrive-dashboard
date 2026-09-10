@@ -136,7 +136,14 @@ export function PaymentsPage() {
 
       <section className="flex flex-col gap-4">
         <h2 className="text-xl font-normal text-black">{tab === 'wallet' ? 'Wallet' : 'Payments'}</h2>
-        <TableToolbar search={list.search} onSearch={list.setSearch} />
+        <TableToolbar
+          search={list.search}
+          onSearch={list.setSearch}
+          country={list.country}
+          onCountry={list.setCountry}
+          from={list.from}
+          onFrom={list.setFrom}
+        />
         <TableFrame>
           <PaymentTable rows={list.data?.data ?? []} onView={(row) => setParams({ view: row.id, tab })} />
           <Pagination

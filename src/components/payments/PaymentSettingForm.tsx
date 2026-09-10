@@ -88,8 +88,10 @@ function FilledSelect({
 const schema = Yup.object({
   accountName: Yup.string().required('Required'),
   bankName: Yup.string().required('Required'),
-  branch: Yup.string(),
-  accountNumberMasked: Yup.string().required('Required'),
+  branch: Yup.string().required('Required'),
+  accountNumberMasked: Yup.string()
+    .required('Required')
+    .matches(/^[0-9]{10,16}$/, 'Enter a 10–16 digit account number'),
   isDefault: Yup.string().required(),
   notes: Yup.string(),
   qrUrl: Yup.string(),
@@ -134,7 +136,7 @@ export function PaymentSettingForm({
           const payload = {
             accountName: values.accountName.trim(),
             bankName: values.bankName,
-            branch: values.branch || undefined,
+            branch: values.branch,
             accountNumberMasked: values.accountNumberMasked.trim(),
             isDefault: values.isDefault === 'yes',
             notes: values.notes.trim() || undefined,
@@ -196,23 +198,35 @@ export function PaymentSettingForm({
                       <p className="mt-1 text-xs text-rose-600">{fk.errors.bankName}</p>
                     )}
                   </div>
-                  <FilledSelect name="branch" value={fk.values.branch} onChange={fk.handleChange}>
-                    <option value="">Branch</option>
-                    {branchOptions.map((name) => (
-                      <option key={name} value={name}>
-                        {name}
-                      </option>
-                    ))}
-                  </FilledSelect>
+                  <div>
+                    <FilledSelect name="branch" value={fk.values.branch} onChange={fk.handleChange}>
+                      <option value="">Branch</option>
+                      {branchOptions.map((name) => (
+                        <option key={name} value={name}>
+                          {name}
+                        </option>
+                      ))}
+                    </FilledSelect>
+                    {fk.touched.branch && fk.errors.branch && (
+                      <p className="mt-1 text-xs text-rose-600">{fk.errors.branch}</p>
+                    )}
+                  </div>
                 </div>
 
                 <div>
                   <input
                     name="accountNumberMasked"
                     value={fk.values.accountNumberMasked}
-                    onChange={fk.handleChange}
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 16)
+                      void fk.setFieldValue('accountNumberMasked', digits)
+                      void fk.setFieldTouched('accountNumberMasked', true, false)
+                    }}
+                    inputMode="numeric"
+                    maxLength={16}
                     placeholder="Account Number"
                     className={fieldClass}
+                    autoComplete="off"
                   />
                   {fk.touched.accountNumberMasked && fk.errors.accountNumberMasked && (
                     <p className="mt-1 text-xs text-rose-600">{fk.errors.accountNumberMasked}</p>
