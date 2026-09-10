@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { api, type Paginated } from '../lib/api'
 import { withToast } from '../lib/toast'
 
@@ -29,7 +29,10 @@ export function useAdminList<T>(key: string, path: string, extra?: Record<string
   const query = useQuery({
     queryKey: [key, params],
     queryFn: async () => (await api.get<Paginated<T>>(path, { params })).data,
-    placeholderData: keepPreviousData,
+    placeholderData: (previousData, previousQuery) => {
+      if (previousQuery?.queryKey[0] !== key) return undefined
+      return previousData
+    },
   })
   return {
     ...query,

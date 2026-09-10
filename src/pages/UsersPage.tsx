@@ -1,7 +1,7 @@
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { BookOpen, Building2, CarFront, HeartHandshake, Plus, Users } from 'lucide-react'
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { api, type PaymentRow } from '../lib/api'
 import { countryName, flagEmoji } from '../lib/cn'
 import { ActionButtons } from '../components/ui/Actions'
@@ -44,31 +44,16 @@ type Driver = {
   status: string
 }
 
-type Order = {
-  id: string
-  publicId: string
-  userId?: string
-  userName: string
-  transId: string
-  amountCents: number
-  method: string
-  city?: string | null
-  countryCode?: string
-  status: string
-  items: { titleSnapshot: string; qty: number }[]
-}
-
 const TABS: { id: Tab; label: string; path: string }[] = [
   { id: 'all', label: 'All', path: '/admin/users' },
   { id: 'donations', label: 'Donation Users', path: '/admin/donations' },
   { id: 'members', label: 'Members', path: '/admin/memberships' },
   { id: 'drivers', label: 'Drivers', path: '/admin/drivers' },
-  { id: 'buyers', label: 'Book Buyers', path: '/admin/book-orders' },
+  { id: 'buyers', label: 'Book Buyers', path: '/admin/users' },
 ]
 
 const USER_COLUMNS = ['ID', 'User Name', 'Contact Details', 'Member ID', 'Country', 'City', 'Status', 'Action']
 const DRIVER_COLUMNS = ['ID', 'User Name', 'Contact Details', 'License', 'Vehicle', 'City', 'Status', 'Action']
-const ORDER_COLUMNS = ['ID', 'User Name', 'Items', 'City', 'Amount', 'Bank/Wallet', 'Trans. ID', 'Status', 'Action']
 
 function stubUser(id: string): User {
   return {
@@ -93,8 +78,9 @@ export function UsersPage() {
   const form = params.get('form')
   const viewId = params.get('view')
   const path = TABS.find((t) => t.id === tab)!.path
-  const list = useAdminList(tab, path)
-  const mut = useAdminMutation(['users', 'donations', 'members', 'drivers', 'book-orders', 'dashboard-summary'])
+  const extra = useMemo(() => (tab === 'buyers' ? { segment: 'buyers' } : undefined), [tab])
+  const list = useAdminList(tab, path, extra)
+  const mut = useAdminMutation(['users', 'buyers', 'donations', 'members', 'drivers', 'book-orders', 'dashboard-summary'])
   const [del, setDel] = useState<User | null>(null)
 
   const { data: summary } = useQuery({
@@ -103,6 +89,7 @@ export function UsersPage() {
       kpis: {
         totalAppUsers: number
         totalBookOrders: number
+        totalBookBuyers?: number
         totalClinicMembers: number
         totalDriverRegistrations: number
       }
@@ -163,7 +150,7 @@ export function UsersPage() {
         />
         <MetricCard
           title="Book Buyers"
-          value={k?.totalBookOrders ?? 0}
+          value={k?.totalBookBuyers ?? k?.totalBookOrders ?? 0}
           icon={<BookOpen className="size-6 text-[#9747FF]" />}
         />
         <MetricCard
@@ -200,7 +187,7 @@ export function UsersPage() {
           onFrom={list.setFrom}
         />
         <TableFrame>
-          {tab === 'all' && (
+          {(tab === 'all' || tab === 'buyers') && (
             <DataTable columns={USER_COLUMNS}>
               {((list.data?.data ?? []) as User[]).map((u) => (
                 <tr key={u.id} className="text-[#262626]">
@@ -269,31 +256,6 @@ export function UsersPage() {
                     <ActionButtons
                       onView={() =>
                         d.userId ? openUser(d.userId, 'view') : navigate(`/drivers?view=${d.id}&tab=details`)
-                      }
-                    />
-                  </td>
-                </tr>
-              ))}
-            </DataTable>
-          )}
-          {tab === 'buyers' && (
-            <DataTable columns={ORDER_COLUMNS}>
-              {((list.data?.data ?? []) as Order[]).map((o) => (
-                <tr key={o.id} className="text-[#262626]">
-                  <td className="px-2.5 py-4">{o.publicId}</td>
-                  <td className="px-2.5 py-4">{o.userName}</td>
-                  <td className="px-2.5 py-4">{o.items.map((i) => `${i.titleSnapshot} ×${i.qty}`).join(', ')}</td>
-                  <td className="px-2.5 py-4">{o.city}</td>
-                  <td className="px-2.5 py-4">{(o.amountCents / 100).toLocaleString('en-NP')}/-</td>
-                  <td className="px-2.5 py-4">{o.method === 'WALLET' ? 'Wallet' : 'Bank'}</td>
-                  <td className="px-2.5 py-4">{o.transId}</td>
-                  <td className="px-2.5 py-4">
-                    <StatusBadge status={o.status} />
-                  </td>
-                  <td className="px-2.5 py-4">
-                    <ActionButtons
-                      onView={() =>
-                        o.userId ? openUser(o.userId, 'view') : navigate(`/books/orders?view=${o.id}`)
                       }
                     />
                   </td>

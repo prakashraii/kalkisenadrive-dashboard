@@ -1,12 +1,13 @@
-import { useRef, useState, type ChangeEvent, type ChangeEventHandler, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent, type ChangeEventHandler, type ReactNode } from 'react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'react-router-dom'
 import { Formik } from 'formik'
-import { ChevronDown } from 'lucide-react'
+import { ChevronDown, FileText, ImagePlus } from 'lucide-react'
 import * as Yup from 'yup'
 import { api } from '../../lib/api'
 import { assetUrl, cn } from '../../lib/cn'
 import { getApiMessage } from '../../lib/toast'
+import { validateUploadFile } from '../../lib/upload'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
 import { toast } from 'sonner'
 import { Tabs } from '../ui/Tabs'
@@ -96,7 +97,9 @@ const fieldClass =
 const schema = Yup.object({
   name: Yup.string().required('Required'),
   phone: Yup.string().matches(/^[0-9]{10}$/, '10-digit phone').required('Required'),
-  email: Yup.string().email().nullable(),
+  email: Yup.string().email('Enter a valid email').required('Required'),
+  memberCode: Yup.string().trim().required('Required'),
+  city: Yup.string().trim().required('Required'),
   licenseNumber: Yup.string().required('Required'),
   vehicleType: Yup.string().required('Required'),
   vehicleNumber: Yup.string().required('Required'),
@@ -135,6 +138,11 @@ function FilledSelect({
   )
 }
 
+function isPdfFile(name?: string | null, url?: string) {
+  const value = `${name ?? ''} ${url ?? ''}`.toLowerCase()
+  return value.includes('.pdf')
+}
+
 function MediaSlot({
   label,
   kind,
@@ -142,6 +150,7 @@ function MediaSlot({
   fileName,
   driverId,
   tall,
+  onQueued,
 }: {
   label: string
   kind: DriverDocumentKind
@@ -149,16 +158,44 @@ function MediaSlot({
   fileName?: string | null
   driverId?: string
   tall?: boolean
+  onQueued?: (kind: DriverDocumentKind, file: File) => void
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
+  const inputId = `driver-doc-${kind}`
+  const errorId = `${inputId}-error`
   const qc = useQueryClient()
   const [busy, setBusy] = useState(false)
-  const isPdf = Boolean(url && (url.toLowerCase().endsWith('.pdf') || fileName?.toLowerCase().endsWith('.pdf')))
+  const [error, setError] = useState('')
+  const [localName, setLocalName] = useState('')
+  const [localPreview, setLocalPreview] = useState('')
 
-  async function onChange(e: ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    e.target.value = ''
-    if (!file || !driverId) return
+  useEffect(
+    () => () => {
+      if (localPreview) URL.revokeObjectURL(localPreview)
+    },
+    [localPreview],
+  )
+
+  const hasLocal = Boolean(localName)
+  const isPdf = hasLocal ? localName.toLowerCase().endsWith('.pdf') : isPdfFile(fileName, url)
+  const preview = !isPdf ? localPreview || (url ? assetUrl(url) : '') : ''
+  const displayName = localName || fileName || label
+
+  async function applyFile(file: File) {
+    const message = validateUploadFile(file, { allowPdf: true })
+    if (message) {
+      setError(message)
+      return
+    }
+    setError('')
+    setLocalName(file.name)
+    setLocalPreview((prev) => {
+      if (prev) URL.revokeObjectURL(prev)
+      return file.type.startsWith('image/') ? URL.createObjectURL(file) : ''
+    })
+    if (!driverId) {
+      onQueued?.(kind, file)
+      return
+    }
     const body = new FormData()
     body.append('file', file)
     setBusy(true)
@@ -167,29 +204,63 @@ function MediaSlot({
       await qc.invalidateQueries({ queryKey: ['driver', driverId] })
       toast.success('Document uploaded')
     } catch (err) {
-      toast.error(getApiMessage(err, 'Could not upload document'))
+      const uploadError = getApiMessage(err, 'Could not upload document')
+      setError(uploadError)
+      toast.error(uploadError)
     } finally {
       setBusy(false)
     }
   }
 
+  function onChange(e: ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    e.target.value = ''
+    if (file) void applyFile(file)
+  }
+
   return (
-    <button
-      type="button"
-      disabled={!driverId || busy}
-      onClick={() => inputRef.current?.click()}
-      className={cn(
-        'relative flex items-center justify-center overflow-hidden rounded-lg bg-[#E5E5E5] text-sm text-[#262626] disabled:cursor-not-allowed',
-        tall ? 'min-h-[168px]' : 'aspect-square min-h-[140px]',
-      )}
-    >
-      {url && !isPdf ? (
-        <img src={assetUrl(url)} alt={label} className="absolute inset-0 size-full object-cover" />
-      ) : (
-        <span className="px-3 text-center">{busy ? 'Uploading…' : url ? fileName || label : label}</span>
-      )}
-      <input ref={inputRef} type="file" accept="image/*,.pdf,application/pdf" className="hidden" onChange={onChange} />
-    </button>
+    <div className="flex min-w-0 flex-col">
+      <label
+        htmlFor={inputId}
+        className={cn(
+          'relative flex cursor-pointer items-center justify-center overflow-hidden rounded-lg bg-[#E5E5E5] text-sm text-[#262626]',
+          tall ? 'min-h-[168px]' : 'aspect-square min-h-[140px]',
+          busy && 'opacity-80',
+          error && 'ring-1 ring-rose-500',
+        )}
+      >
+        <input
+          id={inputId}
+          name={kind}
+          type="file"
+          accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.jpg,.jpeg,.png,.webp,.gif,.pdf"
+          aria-label={label}
+          aria-invalid={Boolean(error)}
+          aria-describedby={error ? errorId : undefined}
+          disabled={busy}
+          onChange={onChange}
+          className="absolute inset-0 z-10 h-full w-full cursor-pointer text-[100px] opacity-0 disabled:cursor-not-allowed"
+        />
+        {preview && !isPdf ? (
+          <img src={preview} alt={label} className="pointer-events-none absolute inset-0 size-full object-cover" />
+        ) : url || localName ? (
+          <span className="pointer-events-none flex flex-col items-center gap-1 px-3 text-center">
+            <FileText className="size-5 text-[#262626]/60" />
+            <span className="line-clamp-2 break-all">{busy ? 'Uploading…' : displayName}</span>
+          </span>
+        ) : (
+          <span className="pointer-events-none flex flex-col items-center gap-1 px-3 text-center text-[#262626]/80">
+            <ImagePlus className="size-5 text-[#262626]/50" />
+            <span>{busy ? 'Uploading…' : label}</span>
+          </span>
+        )}
+      </label>
+      {error ? (
+        <p id={errorId} role="alert" className="mt-1 text-xs text-rose-600">
+          {error}
+        </p>
+      ) : null}
+    </div>
   )
 }
 
@@ -215,6 +286,21 @@ export function DriverDetailsForm({
 
   const docs = data?.documents ?? []
   const docMap = Object.fromEntries(docs.map((d) => [d.kind, d])) as Partial<Record<DriverDocumentKind, DriverDocument>>
+  const queuedFiles = useRef<Partial<Record<DriverDocumentKind, File>>>({})
+
+  function queueFile(kind: DriverDocumentKind, file: File) {
+    queuedFiles.current[kind] = file
+  }
+
+  async function uploadQueued(id: string) {
+    const entries = Object.entries(queuedFiles.current) as [DriverDocumentKind, File][]
+    for (const [kind, file] of entries) {
+      const body = new FormData()
+      body.append('file', file)
+      await api.post(`/admin/drivers/${id}/documents/${kind}`, body)
+    }
+    queuedFiles.current = {}
+  }
 
   function setTab(next: FormTab) {
     const nextParams = new URLSearchParams(params)
@@ -253,8 +339,9 @@ export function DriverDetailsForm({
           const payload = {
             name: values.name,
             phone: values.phone,
-            email: values.email || undefined,
-            city: values.city || undefined,
+            email: values.email,
+            memberCode: values.memberCode.trim(),
+            city: values.city.trim(),
             countryCode: values.countryCode,
             status: values.status,
             licenseNumber: values.licenseNumber,
@@ -272,14 +359,27 @@ export function DriverDetailsForm({
                 error: 'Could not create driver',
               })
               const id = (created as { data?: DriverDetails }).data?.id
-              if (id) onCreated?.(id)
-              else onClose()
+              if (!id) {
+                onClose()
+                return
+              }
+              try {
+                await uploadQueued(id)
+              } catch (err) {
+                toast.error(getApiMessage(err, 'Driver saved, but some documents failed to upload'))
+              }
+              onCreated?.(id)
               return
             }
             await mut.run(() => api.patch(`/admin/drivers/${driverId}`, payload), {
               success: 'Driver updated',
               error: 'Could not update driver',
             })
+            try {
+              await uploadQueued(driverId)
+            } catch (err) {
+              toast.error(getApiMessage(err, 'Details saved, but some documents failed to upload'))
+            }
           } catch {
             // Toast already shown
           }
@@ -291,19 +391,24 @@ export function DriverDetailsForm({
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
                 <div className="flex flex-col gap-6">
                   <div>
-                    <input name="name" value={fk.values.name} onChange={fk.handleChange} placeholder="Driver Name" className={fieldClass} />
+                    <input name="name" value={fk.values.name} onChange={fk.handleChange} onBlur={fk.handleBlur} placeholder="Driver Name" className={fieldClass} />
                     {fk.touched.name && fk.errors.name && <p className="mt-1 text-xs text-rose-600">{fk.errors.name}</p>}
                   </div>
                   <div>
-                    <input name="email" value={fk.values.email} onChange={fk.handleChange} placeholder="Email" className={fieldClass} />
+                    <input name="email" value={fk.values.email} onChange={fk.handleChange} onBlur={fk.handleBlur} placeholder="Email" className={fieldClass} />
                     {fk.touched.email && fk.errors.email && <p className="mt-1 text-xs text-rose-600">{fk.errors.email}</p>}
                   </div>
                   <div>
-                    <input name="phone" value={fk.values.phone} onChange={fk.handleChange} placeholder="Phone" className={fieldClass} />
+                    <input name="phone" value={fk.values.phone} onChange={fk.handleChange} onBlur={fk.handleBlur} placeholder="Phone" className={fieldClass} />
                     {fk.touched.phone && fk.errors.phone && <p className="mt-1 text-xs text-rose-600">{fk.errors.phone}</p>}
                   </div>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <input name="memberCode" value={fk.values.memberCode} readOnly placeholder="Member ID" className={fieldClass} />
+                    <div>
+                      <input name="memberCode" value={fk.values.memberCode} onChange={fk.handleChange} onBlur={fk.handleBlur} placeholder="Member ID" className={fieldClass} />
+                      {fk.touched.memberCode && fk.errors.memberCode && (
+                        <p className="mt-1 text-xs text-rose-600">{fk.errors.memberCode}</p>
+                      )}
+                    </div>
                     <FilledSelect name="countryCode" value={fk.values.countryCode} onChange={fk.handleChange}>
                       <option value="NP">Nepal</option>
                       <option value="US">USA</option>
@@ -312,7 +417,10 @@ export function DriverDetailsForm({
                     </FilledSelect>
                   </div>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                    <input name="city" value={fk.values.city} onChange={fk.handleChange} placeholder="City" className={fieldClass} />
+                    <div>
+                      <input name="city" value={fk.values.city} onChange={fk.handleChange} onBlur={fk.handleBlur} placeholder="City" className={fieldClass} />
+                      {fk.touched.city && fk.errors.city && <p className="mt-1 text-xs text-rose-600">{fk.errors.city}</p>}
+                    </div>
                     <FilledSelect name="status" value={fk.values.status} onChange={fk.handleChange}>
                       <option value="PENDING">Pending</option>
                       <option value="APPROVED">Approved</option>
@@ -329,6 +437,7 @@ export function DriverDetailsForm({
                       url={docMap[slot.kind]?.fileUrl}
                       fileName={docMap[slot.kind]?.fileName}
                       driverId={driverId}
+                      onQueued={queueFile}
                     />
                   ))}
                 </div>
@@ -409,6 +518,7 @@ export function DriverDetailsForm({
                       url={docMap[slot.kind]?.fileUrl}
                       fileName={docMap[slot.kind]?.fileName}
                       driverId={driverId}
+                      onQueued={queueFile}
                     />
                   ))}
                 </div>
@@ -416,75 +526,69 @@ export function DriverDetailsForm({
             )}
 
             {tab === 'documents' && (
-              <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
-                {DOCUMENT_SLOTS.map((slot) => (
-                  <MediaSlot
-                    key={slot.kind}
-                    tall
-                    label={isNew ? 'Save driver details first' : slot.label}
-                    kind={slot.kind}
-                    url={docMap[slot.kind]?.fileUrl}
-                    fileName={docMap[slot.kind]?.fileName}
-                    driverId={driverId}
-                  />
-                ))}
+              <div>
+                <p className="mb-3 text-xs text-[#262626]/70">JPG, PNG, WebP, GIF or PDF · max 5 MB</p>
+                <div className="grid grid-cols-2 gap-6 md:grid-cols-4">
+                  {DOCUMENT_SLOTS.map((slot) => (
+                    <MediaSlot
+                      key={slot.kind}
+                      tall
+                      label={slot.label}
+                      kind={slot.kind}
+                      url={docMap[slot.kind]?.fileUrl}
+                      fileName={docMap[slot.kind]?.fileName}
+                      driverId={driverId}
+                      onQueued={queueFile}
+                    />
+                  ))}
+                </div>
               </div>
             )}
 
-            {tab !== 'documents' && (
-              <div className="flex flex-wrap justify-end gap-3">
-                <button type="button" onClick={onClose} className="h-11 rounded-md border border-black/12 px-6 text-sm text-black">
-                  Back
-                </button>
-                {driverId && data?.status === 'PENDING' && (
-                  <>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void mut
-                          .run(() => api.patch(`/admin/drivers/${driverId}/reject`), {
-                            success: 'Driver rejected',
-                            error: 'Could not reject driver',
-                          })
-                          .catch(() => undefined)
-                      }
-                      className="h-11 rounded-md border border-rose-200 px-6 text-sm text-rose-600"
-                    >
-                      Reject
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        void mut
-                          .run(() => api.patch(`/admin/drivers/${driverId}/approve`), {
-                            success: 'Driver approved',
-                            error: 'Could not approve driver',
-                          })
-                          .catch(() => undefined)
-                      }
-                      className="h-11 rounded-md bg-emerald-600 px-6 text-sm text-white"
-                    >
-                      Approve
-                    </button>
-                  </>
-                )}
-                <button
-                  type="submit"
-                  disabled={fk.isSubmitting}
-                  className="h-11 rounded-md bg-accent px-6 text-sm font-medium text-black disabled:opacity-60"
-                >
-                  {fk.isSubmitting ? 'Saving…' : isNew ? 'Create' : 'Save'}
-                </button>
-              </div>
-            )}
-
-            {tab === 'documents' && (
-              <div className="flex justify-end">
-                <button type="button" onClick={onClose} className="h-11 rounded-md border border-black/12 px-6 text-sm text-black">
-                  Back
-                </button>
-              </div>
-            )}
+            <div className="flex flex-wrap justify-end gap-3">
+              <button type="button" onClick={onClose} className="h-11 rounded-md border border-black/12 px-6 text-sm text-black">
+                Back
+              </button>
+              {driverId && data?.status === 'PENDING' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void mut
+                        .run(() => api.patch(`/admin/drivers/${driverId}/reject`), {
+                          success: 'Driver rejected',
+                          error: 'Could not reject driver',
+                        })
+                        .catch(() => undefined)
+                    }
+                    className="h-11 rounded-md border border-rose-200 px-6 text-sm text-rose-600"
+                  >
+                    Reject
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      void mut
+                        .run(() => api.patch(`/admin/drivers/${driverId}/approve`), {
+                          success: 'Driver approved',
+                          error: 'Could not approve driver',
+                        })
+                        .catch(() => undefined)
+                    }
+                    className="h-11 rounded-md bg-emerald-600 px-6 text-sm text-white"
+                  >
+                    Approve
+                  </button>
+                </>
+              )}
+              <button
+                type="submit"
+                disabled={fk.isSubmitting}
+                className="h-11 rounded-md bg-accent px-6 text-sm font-medium text-black disabled:opacity-60"
+              >
+                {fk.isSubmitting ? 'Saving…' : isNew ? 'Create' : 'Save'}
+              </button>
+            </div>
           </form>
         )}
       </Formik>
