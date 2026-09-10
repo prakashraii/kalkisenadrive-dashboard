@@ -92,6 +92,11 @@ export function ImageUpload({
       <div
         onDragOver={(e) => e.preventDefault()}
         onDrop={onDrop}
+        onClick={(e) => {
+          if (disabled || busy) return
+          if ((e.target as HTMLElement).closest('button')) return
+          inputRef.current?.click()
+        }}
         className={cn(
           'relative flex min-h-[220px] w-full flex-1 items-center justify-center overflow-hidden bg-[#E5E5E5]',
           shape === 'circle' ? 'rounded-full' : 'rounded-lg',
@@ -109,7 +114,7 @@ export function ImageUpload({
           aria-describedby={error ? errorId : undefined}
           disabled={disabled || busy}
           onChange={onFileChange}
-          className="absolute inset-0 z-10 h-full w-full cursor-pointer text-[100px] opacity-0 disabled:cursor-not-allowed"
+          className="sr-only"
         />
         {preview ? (
           <img src={preview} alt="" className="pointer-events-none absolute inset-0 size-full object-cover" />

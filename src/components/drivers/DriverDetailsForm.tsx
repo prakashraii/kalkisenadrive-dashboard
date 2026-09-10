@@ -105,6 +105,15 @@ const schema = Yup.object({
   vehicleNumber: Yup.string().required('Required'),
 })
 
+const DETAILS_FIELDS = ['name', 'email', 'phone', 'memberCode', 'city'] as const
+const VEHICLE_FIELDS = ['vehicleType', 'vehicleNumber', 'licenseNumber'] as const
+
+function tabForErrors(errors: Record<string, unknown>): FormTab | null {
+  if (DETAILS_FIELDS.some((key) => errors[key])) return 'details'
+  if (VEHICLE_FIELDS.some((key) => errors[key])) return 'vehicle'
+  return null
+}
+
 function tabFromParam(value: string | null): FormTab {
   return FORM_TABS.some((t) => t.id === value) ? (value as FormTab) : 'details'
 }
@@ -231,7 +240,6 @@ function MediaSlot({
       >
         <input
           id={inputId}
-          name={kind}
           type="file"
           accept="image/jpeg,image/png,image/webp,image/gif,application/pdf,.jpg,.jpeg,.png,.webp,.gif,.pdf"
           aria-label={label}
@@ -239,7 +247,7 @@ function MediaSlot({
           aria-describedby={error ? errorId : undefined}
           disabled={busy}
           onChange={onChange}
-          className="absolute inset-0 z-10 h-full w-full cursor-pointer text-[100px] opacity-0 disabled:cursor-not-allowed"
+          className="sr-only"
         />
         {preview && !isPdf ? (
           <img src={preview} alt={label} className="pointer-events-none absolute inset-0 size-full object-cover" />
@@ -385,27 +393,47 @@ export function DriverDetailsForm({
           }
         }}
       >
-        {(fk) => (
-          <form onSubmit={fk.handleSubmit} className="flex flex-col gap-8">
+        {(fk) => {
+          const showError = (field: keyof typeof fk.values) =>
+            (fk.touched[field] || fk.submitCount > 0) && fk.errors[field]
+
+          async function submitForm(e: { preventDefault: () => void }) {
+            e.preventDefault()
+            const errors = await fk.validateForm()
+            await fk.setTouched(
+              Object.fromEntries(Object.keys(fk.values).map((key) => [key, true])) as typeof fk.touched,
+              false,
+            )
+            if (Object.keys(errors).length) {
+              const nextTab = tabForErrors(errors)
+              if (nextTab && nextTab !== tab) setTab(nextTab)
+              toast.error('Please fill the required fields')
+              return
+            }
+            await fk.submitForm()
+          }
+
+          return (
+          <form onSubmit={(e) => void submitForm(e)} className="flex flex-col gap-8">
             {tab === 'details' && (
               <div className="grid gap-6 lg:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
                 <div className="flex flex-col gap-6">
                   <div>
                     <input name="name" value={fk.values.name} onChange={fk.handleChange} onBlur={fk.handleBlur} placeholder="Driver Name" className={fieldClass} />
-                    {fk.touched.name && fk.errors.name && <p className="mt-1 text-xs text-rose-600">{fk.errors.name}</p>}
+                    {showError('name') && <p className="mt-1 text-xs text-rose-600">{fk.errors.name}</p>}
                   </div>
                   <div>
                     <input name="email" value={fk.values.email} onChange={fk.handleChange} onBlur={fk.handleBlur} placeholder="Email" className={fieldClass} />
-                    {fk.touched.email && fk.errors.email && <p className="mt-1 text-xs text-rose-600">{fk.errors.email}</p>}
+                    {showError('email') && <p className="mt-1 text-xs text-rose-600">{fk.errors.email}</p>}
                   </div>
                   <div>
                     <input name="phone" value={fk.values.phone} onChange={fk.handleChange} onBlur={fk.handleBlur} placeholder="Phone" className={fieldClass} />
-                    {fk.touched.phone && fk.errors.phone && <p className="mt-1 text-xs text-rose-600">{fk.errors.phone}</p>}
+                    {showError('phone') && <p className="mt-1 text-xs text-rose-600">{fk.errors.phone}</p>}
                   </div>
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div>
                       <input name="memberCode" value={fk.values.memberCode} onChange={fk.handleChange} onBlur={fk.handleBlur} placeholder="Member ID" className={fieldClass} />
-                      {fk.touched.memberCode && fk.errors.memberCode && (
+                      {showError('memberCode') && (
                         <p className="mt-1 text-xs text-rose-600">{fk.errors.memberCode}</p>
                       )}
                     </div>
@@ -419,7 +447,7 @@ export function DriverDetailsForm({
                   <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                     <div>
                       <input name="city" value={fk.values.city} onChange={fk.handleChange} onBlur={fk.handleBlur} placeholder="City" className={fieldClass} />
-                      {fk.touched.city && fk.errors.city && <p className="mt-1 text-xs text-rose-600">{fk.errors.city}</p>}
+                      {showError('city') && <p className="mt-1 text-xs text-rose-600">{fk.errors.city}</p>}
                     </div>
                     <FilledSelect name="status" value={fk.values.status} onChange={fk.handleChange}>
                       <option value="PENDING">Pending</option>
@@ -457,10 +485,11 @@ export function DriverDetailsForm({
                       name="vehicleNumber"
                       value={fk.values.vehicleNumber}
                       onChange={fk.handleChange}
+                      onBlur={fk.handleBlur}
                       placeholder="Vehicle Number"
                       className={fieldClass}
                     />
-                    {fk.touched.vehicleNumber && fk.errors.vehicleNumber && (
+                    {showError('vehicleNumber') && (
                       <p className="mt-1 text-xs text-rose-600">{fk.errors.vehicleNumber}</p>
                     )}
                   </div>
@@ -469,10 +498,11 @@ export function DriverDetailsForm({
                       name="licenseNumber"
                       value={fk.values.licenseNumber}
                       onChange={fk.handleChange}
+                      onBlur={fk.handleBlur}
                       placeholder="License Number"
                       className={fieldClass}
                     />
-                    {fk.touched.licenseNumber && fk.errors.licenseNumber && (
+                    {showError('licenseNumber') && (
                       <p className="mt-1 text-xs text-rose-600">{fk.errors.licenseNumber}</p>
                     )}
                   </div>
@@ -590,7 +620,8 @@ export function DriverDetailsForm({
               </button>
             </div>
           </form>
-        )}
+          )
+        }}
       </Formik>
     </div>
   )

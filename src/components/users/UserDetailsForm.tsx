@@ -53,17 +53,22 @@ const DETAILS_TABS: { id: DetailsTab; label: string }[] = [
   { id: 'membership', label: 'Membership Details' },
 ]
 
-const schema = Yup.object({
-  name: Yup.string().required('Required'),
-  phone: Yup.string().matches(/^[0-9]{10}$/, '10-digit phone').required('Required'),
-  email: Yup.string().email().nullable(),
-  city: Yup.string(),
-  countryCode: Yup.string().required(),
-  status: Yup.string().required(),
-  vehicleType: Yup.string(),
-  licenseNumber: Yup.string(),
-  vehicleNumber: Yup.string(),
-})
+function userSchema(requireVehicle: boolean) {
+  const vehicleField = () =>
+    requireVehicle ? Yup.string().trim().required('Required') : Yup.string()
+  return Yup.object({
+    name: Yup.string().trim().required('Required'),
+    phone: Yup.string().trim().required('Required').matches(/^[0-9]{10}$/, 'Enter a 10-digit phone'),
+    email: Yup.string().trim().required('Required').email('Enter a valid email'),
+    city: Yup.string().trim().required('Required'),
+    countryCode: Yup.string().required('Required'),
+    status: Yup.string().required('Required'),
+    memberCode: Yup.string(),
+    vehicleType: vehicleField(),
+    licenseNumber: vehicleField(),
+    vehicleNumber: vehicleField(),
+  })
+}
 
 const fieldClass =
   'h-11 w-full rounded-lg bg-[#E5E5E5] px-4 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
@@ -71,17 +76,32 @@ const fieldClass =
 const textareaClass =
   'min-h-[168px] w-full resize-none rounded-lg bg-[#E5E5E5] px-4 py-3 text-sm text-[#262626] outline-none placeholder:text-[#262626]/70'
 
+function FieldError({ id, error }: { id: string; error?: string }) {
+  if (!error) return null
+  return (
+    <p id={id} className="mt-1 text-xs text-rose-600">
+      {error}
+    </p>
+  )
+}
+
 function FilledSelect({
   name,
   value,
   onChange,
+  onBlur,
   disabled,
+  invalid,
+  describedBy,
   children,
 }: {
   name: string
   value: string
   onChange?: ChangeEventHandler<HTMLSelectElement>
+  onBlur?: ChangeEventHandler<HTMLSelectElement>
   disabled?: boolean
+  invalid?: boolean
+  describedBy?: string
   children: ReactNode
 }) {
   return (
@@ -90,7 +110,10 @@ function FilledSelect({
         name={name}
         value={value}
         onChange={onChange}
+        onBlur={onBlur}
         disabled={disabled}
+        aria-invalid={invalid || undefined}
+        aria-describedby={describedBy}
         className={cn(fieldClass, 'appearance-none pr-10 disabled:opacity-80')}
       >
         {children}
@@ -163,8 +186,8 @@ export function UserDetailsForm({
         phone: '',
         email: '',
         city: '',
-        countryCode: 'NP',
-        status: 'ACTIVE',
+        countryCode: '',
+        status: '',
         memberCode: '',
         vehicleType: '',
         licenseNumber: '',
@@ -209,15 +232,15 @@ export function UserDetailsForm({
         <Formik
           enableReinitialize
           initialValues={initialValues}
-          validationSchema={schema}
+          validationSchema={userSchema(isNew || isDriver)}
           onSubmit={async (values) => {
             if (readOnly) return
             try {
               const payload = {
-                name: values.name,
-                phone: values.phone,
-                email: values.email || undefined,
-                city: values.city,
+                name: values.name.trim(),
+                phone: values.phone.trim(),
+                email: values.email.trim(),
+                city: values.city.trim(),
                 countryCode: values.countryCode,
                 status: values.status,
               }
@@ -232,14 +255,14 @@ export function UserDetailsForm({
                     await api.patch(`/admin/users/${edit.id}`, payload)
                     if (driver) {
                       await api.patch(`/admin/drivers/${driver.id}`, {
-                        name: values.name,
-                        phone: values.phone,
-                        email: values.email || undefined,
-                        city: values.city,
+                        name: values.name.trim(),
+                        phone: values.phone.trim(),
+                        email: values.email.trim(),
+                        city: values.city.trim(),
                         countryCode: values.countryCode,
-                        licenseNumber: values.licenseNumber,
+                        licenseNumber: values.licenseNumber.trim(),
                         vehicleType: values.vehicleType,
-                        vehicleNumber: values.vehicleNumber,
+                        vehicleNumber: values.vehicleNumber.trim(),
                       })
                     }
                   },
@@ -252,84 +275,185 @@ export function UserDetailsForm({
             }
           }}
         >
-          {(fk) => (
-            <form onSubmit={fk.handleSubmit} className="grid max-w-5xl grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2">
+          {(fk) => {
+            const showError = (field: keyof typeof fk.values) =>
+              Boolean((fk.touched[field] || fk.submitCount > 0) && fk.errors[field])
+            const errorId = (field: string) => (showError(field as keyof typeof fk.values) ? `${field}-error` : undefined)
+
+            async function submitForm(e: { preventDefault: () => void }) {
+              e.preventDefault()
+              if (readOnly) return
+              const errors = await fk.validateForm()
+              await fk.setTouched(
+                Object.fromEntries(Object.keys(fk.values).map((key) => [key, true])) as typeof fk.touched,
+              )
+              const first = (
+                [
+                  'name',
+                  'phone',
+                  'countryCode',
+                  'vehicleType',
+                  'email',
+                  'licenseNumber',
+                  'vehicleNumber',
+                  'city',
+                  'status',
+                ] as const
+              ).find((key) => errors[key])
+              if (first) {
+                document.querySelector<HTMLElement>(`[name="${first}"]`)?.focus()
+                return
+              }
+              await fk.submitForm()
+            }
+
+            return (
+            <form onSubmit={(e) => void submitForm(e)} className="grid max-w-5xl grid-cols-1 gap-x-6 gap-y-8 md:grid-cols-2">
               <div>
                 <input
                   name="name"
                   value={fk.values.name}
                   onChange={fk.handleChange}
+                  onBlur={fk.handleBlur}
                   readOnly={readOnly}
                   placeholder="User Name"
+                  aria-invalid={showError('name') || undefined}
+                  aria-describedby={errorId('name')}
                   className={fieldClass}
                 />
-                {fk.touched.name && fk.errors.name && <p className="mt-1 text-xs text-rose-600">{fk.errors.name}</p>}
+                <FieldError id="name-error" error={showError('name') ? fk.errors.name : undefined} />
               </div>
               <div>
                 <input
                   name="phone"
                   value={fk.values.phone}
                   onChange={fk.handleChange}
+                  onBlur={fk.handleBlur}
                   readOnly={readOnly}
-                  placeholder="Phone"
+                  inputMode="numeric"
+                  maxLength={10}
+                  placeholder="Phone Number"
+                  aria-invalid={showError('phone') || undefined}
+                  aria-describedby={errorId('phone')}
                   className={fieldClass}
                 />
-                {fk.touched.phone && fk.errors.phone && <p className="mt-1 text-xs text-rose-600">{fk.errors.phone}</p>}
+                <FieldError id="phone-error" error={showError('phone') ? fk.errors.phone : undefined} />
               </div>
-              <FilledSelect name="countryCode" value={fk.values.countryCode} onChange={fk.handleChange} disabled={readOnly}>
-                <option value="NP">Nepal</option>
-                <option value="US">USA</option>
-                <option value="GB">UK</option>
-                <option value="IN">India</option>
-              </FilledSelect>
-              <FilledSelect name="vehicleType" value={fk.values.vehicleType} onChange={fk.handleChange} disabled={readOnly}>
-                <option value="">Vehicle Type</option>
-                <option value="Bike">Bike</option>
-                <option value="Car">Car</option>
-                <option value="Scooter">Scooter</option>
-              </FilledSelect>
+              <div>
+                <FilledSelect
+                  name="countryCode"
+                  value={fk.values.countryCode}
+                  onChange={fk.handleChange}
+                  onBlur={fk.handleBlur}
+                  disabled={readOnly}
+                  invalid={showError('countryCode')}
+                  describedBy={errorId('countryCode')}
+                >
+                  <option value="">Country</option>
+                  <option value="NP">Nepal</option>
+                  <option value="US">USA</option>
+                  <option value="GB">UK</option>
+                  <option value="IN">India</option>
+                </FilledSelect>
+                <FieldError id="countryCode-error" error={showError('countryCode') ? fk.errors.countryCode : undefined} />
+              </div>
+              <div>
+                <FilledSelect
+                  name="vehicleType"
+                  value={fk.values.vehicleType}
+                  onChange={fk.handleChange}
+                  onBlur={fk.handleBlur}
+                  disabled={readOnly}
+                  invalid={showError('vehicleType')}
+                  describedBy={errorId('vehicleType')}
+                >
+                  <option value="">Vehicle Type</option>
+                  <option value="Bike">Bike</option>
+                  <option value="Car">Car</option>
+                  <option value="Scooter">Scooter</option>
+                </FilledSelect>
+                <FieldError id="vehicleType-error" error={showError('vehicleType') ? fk.errors.vehicleType : undefined} />
+              </div>
               <div>
                 <input
                   name="email"
                   value={fk.values.email}
                   onChange={fk.handleChange}
+                  onBlur={fk.handleBlur}
                   readOnly={readOnly}
                   placeholder="Email"
+                  aria-invalid={showError('email') || undefined}
+                  aria-describedby={errorId('email')}
                   className={fieldClass}
                 />
-                {fk.touched.email && fk.errors.email && <p className="mt-1 text-xs text-rose-600">{fk.errors.email}</p>}
+                <FieldError id="email-error" error={showError('email') ? fk.errors.email : undefined} />
               </div>
-              <input
-                name="licenseNumber"
-                value={fk.values.licenseNumber}
-                onChange={fk.handleChange}
-                readOnly={readOnly}
-                placeholder="License Number"
-                className={fieldClass}
-              />
-              <input
-                name="vehicleNumber"
-                value={fk.values.vehicleNumber}
-                onChange={fk.handleChange}
-                readOnly={readOnly}
-                placeholder="Vehicle Number"
-                className={`${fieldClass} md:col-span-2`}
-              />
-              <FilledSelect name="city" value={fk.values.city} onChange={fk.handleChange} disabled={readOnly}>
-                <option value="">City</option>
-                {['Kathmandu', 'Lalitpur', 'Bhaktapur', 'Pokhara', 'London', fk.values.city]
-                  .filter((city, i, all) => city && all.indexOf(city) === i)
-                  .map((city) => (
-                    <option key={city} value={city}>
-                      {city}
-                    </option>
-                  ))}
-              </FilledSelect>
-              <FilledSelect name="status" value={fk.values.status} onChange={fk.handleChange} disabled={readOnly}>
-                <option value="ACTIVE">Active</option>
-                <option value="INACTIVE">Inactive</option>
-                <option value="SUSPENDED">Suspended</option>
-              </FilledSelect>
+              <div>
+                <input
+                  name="licenseNumber"
+                  value={fk.values.licenseNumber}
+                  onChange={fk.handleChange}
+                  onBlur={fk.handleBlur}
+                  readOnly={readOnly}
+                  placeholder="License Number"
+                  aria-invalid={showError('licenseNumber') || undefined}
+                  aria-describedby={errorId('licenseNumber')}
+                  className={fieldClass}
+                />
+                <FieldError id="licenseNumber-error" error={showError('licenseNumber') ? fk.errors.licenseNumber : undefined} />
+              </div>
+              <div className="md:col-span-2">
+                <input
+                  name="vehicleNumber"
+                  value={fk.values.vehicleNumber}
+                  onChange={fk.handleChange}
+                  onBlur={fk.handleBlur}
+                  readOnly={readOnly}
+                  placeholder="Vehicle Number"
+                  aria-invalid={showError('vehicleNumber') || undefined}
+                  aria-describedby={errorId('vehicleNumber')}
+                  className={fieldClass}
+                />
+                <FieldError id="vehicleNumber-error" error={showError('vehicleNumber') ? fk.errors.vehicleNumber : undefined} />
+              </div>
+              <div>
+                <FilledSelect
+                  name="city"
+                  value={fk.values.city}
+                  onChange={fk.handleChange}
+                  onBlur={fk.handleBlur}
+                  disabled={readOnly}
+                  invalid={showError('city')}
+                  describedBy={errorId('city')}
+                >
+                  <option value="">City</option>
+                  {['Kathmandu', 'Lalitpur', 'Bhaktapur', 'Pokhara', 'London', fk.values.city]
+                    .filter((city, i, all) => city && all.indexOf(city) === i)
+                    .map((city) => (
+                      <option key={city} value={city}>
+                        {city}
+                      </option>
+                    ))}
+                </FilledSelect>
+                <FieldError id="city-error" error={showError('city') ? fk.errors.city : undefined} />
+              </div>
+              <div>
+                <FilledSelect
+                  name="status"
+                  value={fk.values.status}
+                  onChange={fk.handleChange}
+                  onBlur={fk.handleBlur}
+                  disabled={readOnly}
+                  invalid={showError('status')}
+                  describedBy={errorId('status')}
+                >
+                  <option value="">Status</option>
+                  <option value="ACTIVE">Active</option>
+                  <option value="INACTIVE">Inactive</option>
+                  <option value="SUSPENDED">Suspended</option>
+                </FilledSelect>
+                <FieldError id="status-error" error={showError('status') ? fk.errors.status : undefined} />
+              </div>
               <div className="flex justify-end gap-3 md:col-span-2">
                 <button
                   type="button"
@@ -349,7 +473,8 @@ export function UserDetailsForm({
                 )}
               </div>
             </form>
-          )}
+            )
+          }}
         </Formik>
       )}
 
