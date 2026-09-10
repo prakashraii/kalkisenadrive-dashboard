@@ -6,6 +6,11 @@ import { ChevronDown, FileText, ImagePlus } from 'lucide-react'
 import * as Yup from 'yup'
 import { api } from '../../lib/api'
 import { assetUrl, cn } from '../../lib/cn'
+import {
+  NEPAL_VEHICLE_NUMBER_MESSAGE,
+  NEPAL_VEHICLE_NUMBER_REGEX,
+  normalizeVehicleNumber,
+} from '../../lib/validation'
 import { getApiMessage } from '../../lib/toast'
 import { validateUploadFile } from '../../lib/upload'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
@@ -102,7 +107,10 @@ const schema = Yup.object({
   city: Yup.string().trim().required('Required'),
   licenseNumber: Yup.string().required('Required'),
   vehicleType: Yup.string().required('Required'),
-  vehicleNumber: Yup.string().required('Required'),
+  vehicleNumber: Yup.string()
+    .trim()
+    .required('Required')
+    .matches(NEPAL_VEHICLE_NUMBER_REGEX, NEPAL_VEHICLE_NUMBER_MESSAGE),
 })
 
 const DETAILS_FIELDS = ['name', 'email', 'phone', 'memberCode', 'city'] as const
@@ -484,13 +492,20 @@ export function DriverDetailsForm({
                     <input
                       name="vehicleNumber"
                       value={fk.values.vehicleNumber}
-                      onChange={fk.handleChange}
+                      onChange={(e) => fk.setFieldValue('vehicleNumber', normalizeVehicleNumber(e.target.value))}
                       onBlur={fk.handleBlur}
+                      maxLength={20}
+                      autoCapitalize="characters"
+                      spellCheck={false}
                       placeholder="Vehicle Number"
+                      aria-invalid={showError('vehicleNumber') ? true : undefined}
+                      aria-describedby={showError('vehicleNumber') ? 'vehicleNumber-error' : undefined}
                       className={fieldClass}
                     />
                     {showError('vehicleNumber') && (
-                      <p className="mt-1 text-xs text-rose-600">{fk.errors.vehicleNumber}</p>
+                      <p id="vehicleNumber-error" role="alert" className="mt-1 text-xs text-rose-600">
+                        {fk.errors.vehicleNumber}
+                      </p>
                     )}
                   </div>
                   <div>

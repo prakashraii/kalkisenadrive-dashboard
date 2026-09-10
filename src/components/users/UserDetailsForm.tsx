@@ -5,6 +5,11 @@ import { ChevronDown, Pencil, Search } from 'lucide-react'
 import * as Yup from 'yup'
 import { api, type Paginated, type PaymentRow } from '../../lib/api'
 import { cn, formatMoney } from '../../lib/cn'
+import {
+  NEPAL_VEHICLE_NUMBER_MESSAGE,
+  NEPAL_VEHICLE_NUMBER_REGEX,
+  normalizeVehicleNumber,
+} from '../../lib/validation'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
 import { Pagination } from '../ui/Pagination'
 import { PaymentTable } from '../ui/PaymentTable'
@@ -56,6 +61,15 @@ const DETAILS_TABS: { id: DetailsTab; label: string }[] = [
 function userSchema(requireVehicle: boolean) {
   const vehicleField = () =>
     requireVehicle ? Yup.string().trim().required('Required') : Yup.string()
+  const vehicleNumberField = () => {
+    const schema = Yup.string()
+      .trim()
+      .matches(NEPAL_VEHICLE_NUMBER_REGEX, {
+        message: NEPAL_VEHICLE_NUMBER_MESSAGE,
+        excludeEmptyString: true,
+      })
+    return requireVehicle ? schema.required('Required') : schema
+  }
   return Yup.object({
     name: Yup.string().trim().required('Required'),
     phone: Yup.string().trim().required('Required').matches(/^[0-9]{10}$/, 'Enter a 10-digit phone'),
@@ -66,7 +80,7 @@ function userSchema(requireVehicle: boolean) {
     memberCode: Yup.string(),
     vehicleType: vehicleField(),
     licenseNumber: vehicleField(),
-    vehicleNumber: vehicleField(),
+    vehicleNumber: vehicleNumberField(),
   })
 }
 
@@ -79,7 +93,7 @@ const textareaClass =
 function FieldError({ id, error }: { id: string; error?: string }) {
   if (!error) return null
   return (
-    <p id={id} className="mt-1 text-xs text-rose-600">
+    <p id={id} role="alert" className="mt-1 text-xs text-rose-600">
       {error}
     </p>
   )
@@ -406,9 +420,12 @@ export function UserDetailsForm({
                 <input
                   name="vehicleNumber"
                   value={fk.values.vehicleNumber}
-                  onChange={fk.handleChange}
+                  onChange={(e) => fk.setFieldValue('vehicleNumber', normalizeVehicleNumber(e.target.value))}
                   onBlur={fk.handleBlur}
                   readOnly={readOnly}
+                  maxLength={20}
+                  autoCapitalize="characters"
+                  spellCheck={false}
                   placeholder="Vehicle Number"
                   aria-invalid={showError('vehicleNumber') || undefined}
                   aria-describedby={errorId('vehicleNumber')}
