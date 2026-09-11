@@ -1,5 +1,5 @@
 import type { SelectHTMLAttributes } from 'react'
-import { Calendar, ChevronDown, Filter, Search } from 'lucide-react'
+import { Calendar, ChevronDown, Filter, Search, X } from 'lucide-react'
 
 const COUNTRIES = [
   { value: '', label: 'Country' },
@@ -43,13 +43,25 @@ export function TableToolbar({
   return (
     <div className="flex flex-wrap items-end gap-4">
       <label className="flex h-11 min-w-[240px] flex-1 items-center gap-2.5 rounded-md border border-black/10 bg-white px-4">
-        <Search className="size-5 text-black/60" />
+        <Search className="size-5 shrink-0 text-black/60" aria-hidden="true" />
         <input
+          type="search"
           value={search}
           onChange={(e) => onSearch(e.target.value)}
           placeholder="Type to search..."
-          className="w-full bg-transparent text-xs text-black outline-none placeholder:text-black/60"
+          aria-label="Search records"
+          className="w-full bg-transparent text-xs text-black outline-none placeholder:text-black/60 [&::-webkit-search-cancel-button]:hidden"
         />
+        {search ? (
+          <button
+            type="button"
+            onClick={() => onSearch('')}
+            aria-label="Clear search"
+            className="rounded p-0.5 text-black/45 hover:text-black"
+          >
+            <X className="size-4" aria-hidden="true" />
+          </button>
+        ) : null}
       </label>
       <div className="flex flex-wrap items-center gap-4">
         <button

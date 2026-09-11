@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react'
 import type { PaymentRow } from '../../lib/api'
 import { countryName, flagEmoji, formatDate, formatMoney, formatTime } from '../../lib/cn'
 import { ActionButtons } from './Actions'
@@ -16,12 +17,20 @@ export function PaymentTable({
   nameHeader = 'User Name',
   hideReason,
   membershipColumns,
+  loading,
+  query,
+  onClearSearch,
+  empty,
 }: {
   rows: PaymentRow[]
   onView: (row: PaymentRow) => void
   nameHeader?: string
   hideReason?: boolean
   membershipColumns?: boolean
+  loading?: boolean
+  query?: string
+  onClearSearch?: () => void
+  empty?: ReactNode
 }) {
   const columns = membershipColumns
     ? [
@@ -54,7 +63,13 @@ export function PaymentTable({
       ]
 
   return (
-    <DataTable columns={columns}>
+    <DataTable
+      columns={columns}
+      loading={loading}
+      query={query}
+      onClearSearch={onClearSearch}
+      empty={empty}
+    >
       {rows.map((row) => (
         <tr key={row.id} className="text-[#262626]">
           <td className="px-2.5 py-4">{membershipColumns ? row.memberId || row.publicId : row.publicId}</td>

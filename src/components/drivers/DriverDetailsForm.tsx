@@ -122,6 +122,16 @@ function tabForErrors(errors: Record<string, unknown>): FormTab | null {
   return null
 }
 
+function submitErrorToast(currentTab: FormTab, errors: Record<string, unknown>) {
+  const detailsInvalid = DETAILS_FIELDS.some((key) => errors[key])
+  const vehicleInvalid = VEHICLE_FIELDS.some((key) => errors[key])
+  if (currentTab === 'details' && vehicleInvalid && !detailsInvalid) return 'Complete Vehicle Details also'
+  if (currentTab === 'vehicle' && detailsInvalid && !vehicleInvalid) return 'Complete Driver Details also'
+  if (currentTab === 'documents' && detailsInvalid) return 'Complete Driver Details also'
+  if (currentTab === 'documents' && vehicleInvalid) return 'Complete Vehicle Details also'
+  return null
+}
+
 function tabFromParam(value: string | null): FormTab {
   return FORM_TABS.some((t) => t.id === value) ? (value as FormTab) : 'details'
 }
@@ -415,7 +425,8 @@ export function DriverDetailsForm({
             if (Object.keys(errors).length) {
               const nextTab = tabForErrors(errors)
               if (nextTab && nextTab !== tab) setTab(nextTab)
-              toast.error('Please fill the required fields')
+              const message = submitErrorToast(tab, errors)
+              if (message) toast.error(message)
               return
             }
             await fk.submitForm()

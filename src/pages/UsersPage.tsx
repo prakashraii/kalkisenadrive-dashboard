@@ -7,6 +7,7 @@ import { countryName, flagEmoji } from '../lib/cn'
 import { ActionButtons } from '../components/ui/Actions'
 import { ConfirmDialog } from '../components/ui/ConfirmDialog'
 import { DataTable, TableFrame } from '../components/ui/DataTable'
+import { EmptyState, EmptyStateAction } from '../components/ui/EmptyState'
 import { MetricCard } from '../components/ui/MetricCard'
 import { Pagination } from '../components/ui/Pagination'
 import { PaymentTable } from '../components/ui/PaymentTable'
@@ -68,7 +69,7 @@ function stubUser(id: string): User {
 }
 
 function tabFromParam(value: string | null): Tab {
-  return TABS.some((t) => t.id === value) ? (value as Tab) : 'donations'
+  return TABS.some((t) => t.id === value) ? (value as Tab) : 'all'
 }
 
 export function UsersPage() {
@@ -115,6 +116,28 @@ export function UsersPage() {
 
   const k = summary?.kpis
   const paymentTabs = tab === 'donations' || tab === 'members'
+  const rows = list.data?.data ?? []
+  const total = list.data?.meta.total ?? 0
+  const searchQuery = list.search.trim()
+  const emptyAction = searchQuery ? (
+    <EmptyStateAction onClick={() => list.setSearch('')}>Clear search</EmptyStateAction>
+  ) : (
+    <EmptyStateAction onClick={() => setParams({ tab, form: 'new' })}>Add user</EmptyStateAction>
+  )
+  const listEmpty = (
+    <EmptyState
+      query={searchQuery}
+      icon={searchQuery ? undefined : <Users className="size-6" strokeWidth={1.5} aria-hidden="true" />}
+      description={
+        searchQuery
+          ? undefined
+          : paymentTabs
+            ? 'No records to display for this tab yet.'
+            : 'No users to display. Add a user to get started.'
+      }
+      action={emptyAction}
+    />
+  )
 
   if (form === 'new') {
     return <UserDetailsForm edit="new" onClose={closeForm} />
@@ -188,8 +211,13 @@ export function UsersPage() {
         />
         <TableFrame>
           {(tab === 'all' || tab === 'buyers') && (
-            <DataTable columns={USER_COLUMNS}>
-              {((list.data?.data ?? []) as User[]).map((u) => (
+            <DataTable
+              columns={USER_COLUMNS}
+              loading={list.isLoading}
+              query={searchQuery}
+              empty={listEmpty}
+            >
+              {(rows as User[]).map((u) => (
                 <tr key={u.id} className="text-[#262626]">
                   <td className="px-2.5 py-4">{u.publicId}</td>
                   <td className="px-2.5 py-4">{u.name}</td>
@@ -223,7 +251,10 @@ export function UsersPage() {
           )}
           {paymentTabs && (
             <PaymentTable
-              rows={(list.data?.data ?? []) as PaymentRow[]}
+              rows={rows as PaymentRow[]}
+              loading={list.isLoading}
+              query={searchQuery}
+              empty={listEmpty}
               onView={(row) => {
                 if (row.userId) {
                   openUser(row.userId, 'view')
@@ -238,8 +269,13 @@ export function UsersPage() {
             />
           )}
           {tab === 'drivers' && (
-            <DataTable columns={DRIVER_COLUMNS}>
-              {((list.data?.data ?? []) as Driver[]).map((d) => (
+            <DataTable
+              columns={DRIVER_COLUMNS}
+              loading={list.isLoading}
+              query={searchQuery}
+              empty={listEmpty}
+            >
+              {(rows as Driver[]).map((d) => (
                 <tr key={d.id} className="text-[#262626]">
                   <td className="px-2.5 py-4">{d.publicId}</td>
                   <td className="px-2.5 py-4">{d.name}</td>
@@ -263,13 +299,15 @@ export function UsersPage() {
               ))}
             </DataTable>
           )}
-          <Pagination
-            page={list.data?.meta.page ?? 1}
-            pageCount={list.data?.meta.pageCount ?? 1}
-            total={list.data?.meta.total ?? 0}
-            limit={10}
-            onPage={list.setPage}
-          />
+          {total > 0 && (
+            <Pagination
+              page={list.data?.meta.page ?? 1}
+              pageCount={list.data?.meta.pageCount ?? 1}
+              total={total}
+              limit={10}
+              onPage={list.setPage}
+            />
+          )}
         </TableFrame>
       </section>
 
