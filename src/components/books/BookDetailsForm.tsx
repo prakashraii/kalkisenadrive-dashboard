@@ -135,6 +135,19 @@ const emptyChapter = (chapterNo: number, language: string): BookChapter => ({
   sortOrder: chapterNo - 1,
 })
 
+function normalizeChapter(chapter: BookChapter, language: string): BookChapter {
+  return {
+    ...chapter,
+    chapterNo: chapter.chapterNo || 1,
+    title: chapter.title ?? '',
+    content: chapter.content ?? '',
+    contentUrl: chapter.contentUrl ?? '',
+    language: chapter.language ?? language,
+  }
+}
+
+const optionalText = Yup.string().nullable()
+
 const schema = Yup.object({
   title: Yup.string().required('Required'),
   author: Yup.string().required('Required'),
@@ -150,19 +163,19 @@ const schema = Yup.object({
     .max(PG_INT_MAX, STOCK_TOO_LARGE_MESSAGE)
     .required('Required'),
   type: Yup.string().required(),
-  description: Yup.string(),
-  shortDetails: Yup.string(),
+  description: optionalText,
+  shortDetails: optionalText,
   language: Yup.string().required(),
   status: Yup.string().required(),
-  coverUrl: Yup.string(),
-  authorPhotoUrl: Yup.string(),
+  coverUrl: optionalText,
+  authorPhotoUrl: optionalText,
   chapters: Yup.array().of(
     Yup.object({
       chapterNo: Yup.number().min(1).required(),
-      title: Yup.string(),
-      content: Yup.string(),
-      contentUrl: Yup.string(),
-      language: Yup.string(),
+      title: optionalText,
+      content: optionalText,
+      contentUrl: optionalText,
+      language: optionalText,
     }),
   ),
 })
@@ -198,13 +211,16 @@ export function BookDetailsForm({
     setParams(nextParams, { replace: true })
   }
 
-  const initialChapters = book?.chapters?.length ? book.chapters : [emptyChapter(1, book?.language ?? 'en')]
+  const bookLanguage = book?.language ?? 'en'
+  const initialChapters = book?.chapters?.length
+    ? book.chapters.map((chapter) => normalizeChapter(chapter, bookLanguage))
+    : [emptyChapter(1, bookLanguage)]
 
   const initialValues = {
     title: book?.title ?? '',
     author: book?.author ?? '',
     authorPhotoUrl: book?.authorPhotoUrl ?? '',
-    price: book ? book.priceCents / 100 : 0,
+    price: book ? Number((book.priceCents / 100).toFixed(2)) : 0,
     stock: book?.stock ?? 0,
     type: book?.type ?? 'PHYSICAL',
     description: book?.description ?? '',
@@ -248,10 +264,10 @@ export function BookDetailsForm({
             return
           }
           const chapters = values.chapters
-            .filter((c) => c.title.trim())
+            .filter((c) => (c.title ?? '').trim())
             .map((c, i) => ({
               chapterNo: c.chapterNo || i + 1,
-              title: c.title.trim(),
+              title: (c.title ?? '').trim(),
               content: c.content || undefined,
               contentUrl: c.contentUrl || undefined,
               language: c.language || values.language,
@@ -295,6 +311,9 @@ export function BookDetailsForm({
           const chapter = chapters[safeIndex] ?? emptyChapter(1, fk.values.language)
           const reviews = book?.reviews ?? []
           const ratingAvg = book?.ratingAvg ?? book?.rating ?? 0
+          const showError = (field: 'title' | 'author' | 'price' | 'stock') =>
+            Boolean((fk.touched[field] || fk.submitCount > 0) && fk.errors[field])
+          const hasSubmitErrors = fk.submitCount > 0 && Object.keys(fk.errors).length > 0
 
           function setChapter(patch: Partial<BookChapter>) {
             const next = chapters.map((c, i) => (i === safeIndex ? { ...c, ...patch } : c))
@@ -302,7 +321,7 @@ export function BookDetailsForm({
           }
 
           return (
-            <form onSubmit={fk.handleSubmit} className="max-w-6xl">
+            <form noValidate onSubmit={fk.handleSubmit} className="max-w-6xl">
               <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(240px,0.7fr)]">
                 {tab === 'about' && (
                   <div className="flex flex-col gap-5">
@@ -315,7 +334,7 @@ export function BookDetailsForm({
                         placeholder="Title"
                         className={fieldClass}
                       />
-                      {fk.touched.title && fk.errors.title && (
+                      {showError('title') && (
                         <p className="mt-1 text-xs text-rose-600">{fk.errors.title}</p>
                       )}
                     </div>
@@ -339,7 +358,7 @@ export function BookDetailsForm({
                           placeholder="Author"
                           className={fieldClass}
                         />
-                        {fk.touched.author && fk.errors.author && (
+                        {showError('author') && (
                           <p className="mt-1 text-xs text-rose-600">{fk.errors.author}</p>
                         )}
                         <div className="mt-2">
@@ -370,11 +389,11 @@ export function BookDetailsForm({
                           onChange={fk.handleChange}
                           readOnly={readOnly}
                           placeholder="Price"
-                          aria-invalid={Boolean(fk.touched.price && fk.errors.price)}
-                          aria-describedby={fk.touched.price && fk.errors.price ? 'book-price-error' : undefined}
+                          aria-invalid={showError('price')}
+                          aria-describedby={showError('price') ? 'book-price-error' : undefined}
                           className={fieldClass}
                         />
-                        {fk.touched.price && fk.errors.price && (
+                        {showError('price') && (
                           <p id="book-price-error" role="alert" className="mt-1 text-xs text-rose-600">
                             {fk.errors.price}
                           </p>
@@ -395,11 +414,11 @@ export function BookDetailsForm({
                           onChange={fk.handleChange}
                           readOnly={readOnly}
                           placeholder="Stock"
-                          aria-invalid={Boolean(fk.touched.stock && fk.errors.stock)}
-                          aria-describedby={fk.touched.stock && fk.errors.stock ? 'book-stock-error' : undefined}
+                          aria-invalid={showError('stock')}
+                          aria-describedby={showError('stock') ? 'book-stock-error' : undefined}
                           className={fieldClass}
                         />
-                        {fk.touched.stock && fk.errors.stock && (
+                        {showError('stock') && (
                           <p id="book-stock-error" role="alert" className="mt-1 text-xs text-rose-600">
                             {fk.errors.stock}
                           </p>
@@ -585,6 +604,11 @@ export function BookDetailsForm({
                 )}
               </div>
 
+              {hasSubmitErrors && (
+                <p className="mt-6 text-sm text-rose-600" role="alert">
+                  Please fix the highlighted fields before saving.
+                </p>
+              )}
               <div className="mt-8 flex justify-end gap-3">
                 <button
                   type="button"
