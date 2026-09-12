@@ -39,12 +39,14 @@ function FilledSelect({
   onChange,
   disabled,
   children,
+  label,
 }: {
   name: string
   value: string
   onChange?: ChangeEventHandler<HTMLSelectElement>
   disabled?: boolean
   children: ReactNode
+  label?: string
 }) {
   return (
     <div className="relative">
@@ -53,6 +55,7 @@ function FilledSelect({
         value={value}
         onChange={onChange}
         disabled={disabled}
+        aria-label={label}
         className={cn(fieldClass, 'appearance-none pr-10 disabled:opacity-80')}
       >
         {children}
@@ -106,17 +109,19 @@ export function VideoDetailsForm({
     thumbnailUrl: video?.thumbnailUrl ?? '',
     published: video?.published ?? true,
     sortOrder: video?.sortOrder ?? 0,
+    videoFile: '',
   }
 
   const schema = useMemo(
     () =>
       Yup.object({
-        title: Yup.string().required('Required'),
+        title: Yup.string().trim().required('Title is required'),
         description: Yup.string(),
         thumbnailUrl: Yup.string(),
+        videoFile: Yup.string(),
         sourceUrl:
           tab === 'link'
-            ? Yup.string().url('Enter a valid URL').required('Required')
+            ? Yup.string().trim().url('Enter a valid video URL').required('Video URL is required')
             : Yup.string(),
       }),
     [tab],
@@ -128,22 +133,33 @@ export function VideoDetailsForm({
     setParams(nextParams, { replace: true })
   }
 
-  function pickFile(next?: File | null) {
+  function applyFile(
+    next: File | null | undefined,
+    setFieldValue: (field: string, value: string) => void,
+    setFieldError: (field: string, message: string | undefined) => void,
+    setFieldTouched: (field: string, touched?: boolean, shouldValidate?: boolean) => void,
+  ) {
     if (!next) return
     if (!next.type.startsWith('video/') && !/\.(mp4|webm|mov|m4v|mkv)$/i.test(next.name)) {
       const message = 'Choose an MP4, WebM or MOV video file'
+      setFieldTouched('videoFile', true, false)
+      setFieldError('videoFile', message)
       setError(message)
       toast.error(message)
       return
     }
     if (next.size > 200 * 1024 * 1024) {
       const message = 'Video must be 200 MB or smaller'
+      setFieldTouched('videoFile', true, false)
+      setFieldError('videoFile', message)
       setError(message)
       toast.error(message)
       return
     }
     setError('')
     setFile(next)
+    void setFieldValue('videoFile', next.name)
+    setFieldError('videoFile', undefined)
     setFilePreview((prev) => {
       if (prev) URL.revokeObjectURL(prev)
       return URL.createObjectURL(next)
@@ -204,6 +220,12 @@ export function VideoDetailsForm({
         enableReinitialize
         initialValues={initialValues}
         validationSchema={schema}
+        validate={() => {
+          if (tab === 'video' && isNew && !file) {
+            return { videoFile: 'Video file is required' }
+          }
+          return {}
+        }}
         onSubmit={async (values) => {
           if (readOnly) {
             onClose()
@@ -213,9 +235,8 @@ export function VideoDetailsForm({
           try {
             if (tab === 'video') {
               if (isNew && !file) {
-                const message = 'Choose a video file to upload'
+                const message = 'Video file is required'
                 setError(message)
-                toast.error(message)
                 return
               }
               if (file || isNew) {
@@ -288,57 +309,82 @@ export function VideoDetailsForm({
           function onDrop(e: DragEvent<HTMLLabelElement>) {
             e.preventDefault()
             if (readOnly) return
-            pickFile(e.dataTransfer.files?.[0])
+            applyFile(e.dataTransfer.files?.[0], fk.setFieldValue, fk.setFieldError, fk.setFieldTouched)
           }
 
           function onFileChange(e: ChangeEvent<HTMLInputElement>) {
-            pickFile(e.target.files?.[0])
+            applyFile(e.target.files?.[0], fk.setFieldValue, fk.setFieldError, fk.setFieldTouched)
             e.target.value = ''
           }
 
+          const showError = (field: 'title' | 'sourceUrl' | 'videoFile') =>
+            Boolean((fk.touched[field] || fk.submitCount > 0) && fk.errors[field])
+          const fileInvalid = showError('videoFile')
+          const urlInvalid = showError('sourceUrl')
+          const hasSubmitErrors = fk.submitCount > 0 && Object.keys(fk.errors).length > 0
+
           return (
-            <form onSubmit={fk.handleSubmit} className="max-w-6xl">
+            <form noValidate onSubmit={fk.handleSubmit} className="max-w-6xl">
+              {hasSubmitErrors && (
+                <div
+                  role="alert"
+                  className="mb-4 rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700"
+                >
+                  Please fix the highlighted fields before saving.
+                </div>
+              )}
               {tab === 'video' ? (
                 <div className="grid grid-cols-1 gap-8 lg:grid-cols-[minmax(280px,0.85fr)_minmax(0,1fr)]">
-                  <input
-                    ref={fileRef}
-                    type="file"
-                    accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v,.mkv"
-                    className="hidden"
-                    disabled={readOnly}
-                    onChange={onFileChange}
-                  />
-                  <label
-                    onDragOver={(e) => e.preventDefault()}
-                    onDrop={onDrop}
-                    className={dropClass}
-                    onClick={() => !readOnly && fileRef.current?.click()}
-                  >
-                    {filePreview || existingFileUrl ? (
-                      <video
-                        src={filePreview || existingFileUrl}
-                        controls
-                        className="h-full min-h-[420px] w-full object-cover"
-                        onClick={(e) => e.stopPropagation()}
-                      />
-                    ) : (
-                      <span>{readOnly ? 'No video file' : 'Drop video or click to upload'}</span>
+                  <div>
+                    <input
+                      ref={fileRef}
+                      type="file"
+                      accept="video/mp4,video/webm,video/quicktime,.mp4,.webm,.mov,.m4v,.mkv"
+                      className="hidden"
+                      disabled={readOnly}
+                      onChange={onFileChange}
+                    />
+                    <label
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={onDrop}
+                      className={cn(dropClass, fileInvalid && 'ring-2 ring-inset ring-rose-500')}
+                      aria-invalid={fileInvalid}
+                      aria-describedby={fileInvalid ? 'video-file-error' : undefined}
+                      onClick={() => !readOnly && fileRef.current?.click()}
+                    >
+                      {filePreview || existingFileUrl ? (
+                        <video
+                          src={filePreview || existingFileUrl}
+                          controls
+                          className="h-full min-h-[420px] w-full object-cover"
+                          onClick={(e) => e.stopPropagation()}
+                        />
+                      ) : (
+                        <span>{readOnly ? 'No video file' : 'Drop video or click to upload'}</span>
+                      )}
+                    </label>
+                    {fileInvalid && (
+                      <p id="video-file-error" role="alert" className="mt-2 text-xs text-rose-600">
+                        {fk.errors.videoFile}
+                      </p>
                     )}
-                  </label>
+                  </div>
 
                   <div className="flex flex-col gap-6">
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                       <FilledSelect
                         name="published"
+                        label="Visibility"
                         value={fk.values.published ? 'true' : 'false'}
                         onChange={(e) => void fk.setFieldValue('published', e.target.value === 'true')}
                         disabled={readOnly}
                       >
-                        <option value="true">Published</option>
-                        <option value="false">Draft</option>
+                        <option value="true">Public</option>
+                        <option value="false">Private</option>
                       </FilledSelect>
                       <FilledSelect
                         name="sortOrder"
+                        label="Sort order"
                         value={String(fk.values.sortOrder)}
                         onChange={fk.handleChange}
                         disabled={readOnly}
@@ -357,10 +403,14 @@ export function VideoDetailsForm({
                         onChange={fk.handleChange}
                         readOnly={readOnly}
                         placeholder="Title"
-                        className={fieldClass}
+                        aria-invalid={showError('title')}
+                        aria-describedby={showError('title') ? 'video-title-error' : undefined}
+                        className={cn(fieldClass, showError('title') && 'ring-2 ring-inset ring-rose-500')}
                       />
-                      {fk.touched.title && fk.errors.title && (
-                        <p className="mt-1 text-xs text-rose-600">{fk.errors.title}</p>
+                      {showError('title') && (
+                        <p id="video-title-error" role="alert" className="mt-1 text-xs text-rose-600">
+                          {fk.errors.title}
+                        </p>
                       )}
                     </div>
                     <ImageUpload
@@ -386,29 +436,37 @@ export function VideoDetailsForm({
                   <div className="flex flex-col gap-6">
                     <div>
                       <input
+                        id="video-url"
                         name="sourceUrl"
                         value={fk.values.sourceUrl}
                         onChange={fk.handleChange}
+                        onBlur={fk.handleBlur}
                         readOnly={readOnly}
                         placeholder="Video URL"
-                        className={fieldClass}
+                        aria-invalid={urlInvalid}
+                        aria-describedby={urlInvalid ? 'video-url-error' : undefined}
+                        className={cn(fieldClass, urlInvalid && 'ring-2 ring-inset ring-rose-500')}
                       />
-                      {fk.touched.sourceUrl && fk.errors.sourceUrl && (
-                        <p className="mt-1 text-xs text-rose-600">{fk.errors.sourceUrl}</p>
+                      {urlInvalid && (
+                        <p id="video-url-error" role="alert" className="mt-1 text-xs text-rose-600">
+                          {fk.errors.sourceUrl}
+                        </p>
                       )}
                     </div>
                     <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                       <FilledSelect
                         name="published"
+                        label="Visibility"
                         value={fk.values.published ? 'true' : 'false'}
                         onChange={(e) => void fk.setFieldValue('published', e.target.value === 'true')}
                         disabled={readOnly}
                       >
-                        <option value="true">Published</option>
-                        <option value="false">Draft</option>
+                        <option value="true">Public</option>
+                        <option value="false">Private</option>
                       </FilledSelect>
                       <FilledSelect
                         name="sortOrder"
+                        label="Sort order"
                         value={String(fk.values.sortOrder)}
                         onChange={fk.handleChange}
                         disabled={readOnly}
@@ -427,10 +485,14 @@ export function VideoDetailsForm({
                         onChange={fk.handleChange}
                         readOnly={readOnly}
                         placeholder="Title"
-                        className={fieldClass}
+                        aria-invalid={showError('title')}
+                        aria-describedby={showError('title') ? 'video-link-title-error' : undefined}
+                        className={cn(fieldClass, showError('title') && 'ring-2 ring-inset ring-rose-500')}
                       />
-                      {fk.touched.title && fk.errors.title && (
-                        <p className="mt-1 text-xs text-rose-600">{fk.errors.title}</p>
+                      {showError('title') && (
+                        <p id="video-link-title-error" role="alert" className="mt-1 text-xs text-rose-600">
+                          {fk.errors.title}
+                        </p>
                       )}
                     </div>
                     <ImageUpload
@@ -486,7 +548,7 @@ export function VideoDetailsForm({
                     disabled={fk.isSubmitting}
                     className="h-11 rounded-md bg-[#001E5E] px-6 text-sm font-medium text-white disabled:opacity-60"
                   >
-                    {fk.isSubmitting ? 'Uploading…' : 'Upload'}
+                    {fk.isSubmitting ? 'Saving…' : 'Save'}
                   </button>
                 )}
               </div>

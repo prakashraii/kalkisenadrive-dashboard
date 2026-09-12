@@ -16,6 +16,7 @@ export function VideosPage() {
   const list = useAdminList<Video>('videos', '/admin/videos')
   const mut = useAdminMutation(['videos'])
   const [del, setDel] = useState<Video | null>(null)
+  const [visibilityId, setVisibilityId] = useState<string | null>(null)
 
   if (form === 'new') {
     return <VideoDetailsForm videoId="new" onClose={() => setParams({})} />
@@ -94,6 +95,20 @@ export function VideosPage() {
             onView={() => setParams({ view: v.id, tab: videoTab(v) })}
             onEdit={() => setParams({ form: v.id, tab: videoTab(v) })}
             onDelete={() => setDel(v)}
+            visibilityPending={visibilityId === v.id}
+            onVisibilityChange={async (published) => {
+              setVisibilityId(v.id)
+              try {
+                await mut.run(() => api.patch(`/admin/videos/${v.id}`, { published }), {
+                  success: published ? 'Video is now public' : 'Video is now private',
+                  error: 'Could not update visibility',
+                })
+              } catch {
+                // Toast already shown
+              } finally {
+                setVisibilityId(null)
+              }
+            }}
           />
         ))}
       </div>

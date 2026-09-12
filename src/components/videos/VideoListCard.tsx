@@ -41,11 +41,15 @@ export function VideoListCard({
   onView,
   onEdit,
   onDelete,
+  onVisibilityChange,
+  visibilityPending = false,
 }: {
   video: Video
   onView: () => void
   onEdit: () => void
   onDelete: () => void
+  onVisibilityChange?: (published: boolean) => void
+  visibilityPending?: boolean
 }) {
   const fileUrl = isUploadedVideo(video.sourceUrl)
   const thumb = videoThumbnail(video)
@@ -117,10 +121,22 @@ export function VideoListCard({
         <div className="text-sm text-[#262626]/40">—</div>
       )}
 
-      <div className="flex items-center gap-2 text-sm text-black">
+      <button
+        type="button"
+        disabled={!onVisibilityChange || visibilityPending}
+        onClick={() => onVisibilityChange?.(!video.published)}
+        title={video.published ? 'Set to Private' : 'Set to Public'}
+        aria-pressed={video.published}
+        aria-label={video.published ? 'Visibility Public. Click to set Private' : 'Visibility Private. Click to set Public'}
+        className={cn(
+          'inline-flex h-9 items-center gap-2 rounded-md px-2 text-sm',
+          video.published ? 'text-black' : 'text-[#262626]',
+          onVisibilityChange && 'hover:bg-black/5 disabled:opacity-60',
+        )}
+      >
         {video.published ? <Globe className="size-4 shrink-0" /> : <Lock className="size-4 shrink-0" />}
         {video.published ? 'Public' : 'Private'}
-      </div>
+      </button>
 
       <p className="text-sm text-black">{video.createdAt ? formatDaysAgo(video.createdAt) : '—'}</p>
 
