@@ -7,6 +7,13 @@ import * as Yup from 'yup'
 import { api } from '../../lib/api'
 import { cn, formatDate } from '../../lib/cn'
 import { mediaUrl } from '../../lib/media'
+import {
+  MAX_PRICE_RUPEES,
+  PG_INT_MAX,
+  PRICE_TOO_LARGE_MESSAGE,
+  STOCK_TOO_LARGE_MESSAGE,
+  rupeesFitIntCents,
+} from '../../lib/validation'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
 import { ImageUpload } from '../ui/ImageUpload'
 import { Tabs } from '../ui/Tabs'
@@ -131,8 +138,17 @@ const emptyChapter = (chapterNo: number, language: string): BookChapter => ({
 const schema = Yup.object({
   title: Yup.string().required('Required'),
   author: Yup.string().required('Required'),
-  price: Yup.number().min(0, 'Must be 0 or more').required('Required'),
-  stock: Yup.number().min(0, 'Must be 0 or more').required('Required'),
+  price: Yup.number()
+    .typeError('Enter a valid price')
+    .min(0, 'Must be 0 or more')
+    .test('fits-int-cents', PRICE_TOO_LARGE_MESSAGE, (value) => value == null || rupeesFitIntCents(value))
+    .required('Required'),
+  stock: Yup.number()
+    .typeError('Enter a valid stock')
+    .integer('Stock must be a whole number')
+    .min(0, 'Must be 0 or more')
+    .max(PG_INT_MAX, STOCK_TOO_LARGE_MESSAGE)
+    .required('Required'),
   type: Yup.string().required(),
   description: Yup.string(),
   shortDetails: Yup.string(),
@@ -342,29 +358,53 @@ export function BookDetailsForm({
                         <option value="PHYSICAL">Physical</option>
                         <option value="DIGITAL">Digital</option>
                       </FilledSelect>
-                      <input
-                        type="number"
-                        name="price"
-                        min={0}
-                        value={fk.values.price}
-                        onChange={fk.handleChange}
-                        readOnly={readOnly}
-                        placeholder="Price"
-                        className={fieldClass}
-                      />
+                      <div>
+                        <input
+                          id="book-price"
+                          type="number"
+                          name="price"
+                          min={0}
+                          max={MAX_PRICE_RUPEES}
+                          step="0.01"
+                          value={fk.values.price}
+                          onChange={fk.handleChange}
+                          readOnly={readOnly}
+                          placeholder="Price"
+                          aria-invalid={Boolean(fk.touched.price && fk.errors.price)}
+                          aria-describedby={fk.touched.price && fk.errors.price ? 'book-price-error' : undefined}
+                          className={fieldClass}
+                        />
+                        {fk.touched.price && fk.errors.price && (
+                          <p id="book-price-error" role="alert" className="mt-1 text-xs text-rose-600">
+                            {fk.errors.price}
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-                      <input
-                        type="number"
-                        name="stock"
-                        min={0}
-                        value={fk.values.stock}
-                        onChange={fk.handleChange}
-                        readOnly={readOnly}
-                        placeholder="Stock"
-                        className={fieldClass}
-                      />
+                      <div>
+                        <input
+                          id="book-stock"
+                          type="number"
+                          name="stock"
+                          min={0}
+                          max={PG_INT_MAX}
+                          step={1}
+                          value={fk.values.stock}
+                          onChange={fk.handleChange}
+                          readOnly={readOnly}
+                          placeholder="Stock"
+                          aria-invalid={Boolean(fk.touched.stock && fk.errors.stock)}
+                          aria-describedby={fk.touched.stock && fk.errors.stock ? 'book-stock-error' : undefined}
+                          className={fieldClass}
+                        />
+                        {fk.touched.stock && fk.errors.stock && (
+                          <p id="book-stock-error" role="alert" className="mt-1 text-xs text-rose-600">
+                            {fk.errors.stock}
+                          </p>
+                        )}
+                      </div>
                       <FilledSelect
                         name="language"
                         value={fk.values.language}

@@ -2,6 +2,7 @@ import { useQuery } from '@tanstack/react-query'
 import { Formik } from 'formik'
 import * as Yup from 'yup'
 import { api, type Paginated } from '../../lib/api'
+import { MAX_PRICE_RUPEES, PRICE_TOO_LARGE_MESSAGE, rupeesFitIntCents } from '../../lib/validation'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
 
 const fieldClass =
@@ -10,7 +11,11 @@ const fieldClass =
 const schema = Yup.object({
   userId: Yup.string().required('Required'),
   type: Yup.string().required(),
-  amount: Yup.number().min(1, 'Must be 1 or more').required('Required'),
+  amount: Yup.number()
+    .typeError('Enter a valid amount')
+    .min(1, 'Must be 1 or more')
+    .test('fits-int-cents', PRICE_TOO_LARGE_MESSAGE, (value) => value == null || rupeesFitIntCents(value))
+    .required('Required'),
   method: Yup.string().required(),
   note: Yup.string(),
 })
@@ -74,15 +79,24 @@ export function DonationRecordForm({
               </select>
               <div>
                 <input
+                  id="donation-amount"
                   type="number"
                   name="amount"
                   min={1}
+                  max={MAX_PRICE_RUPEES}
+                  step="0.01"
                   value={fk.values.amount}
                   onChange={fk.handleChange}
                   placeholder="Amount"
+                  aria-invalid={Boolean(fk.touched.amount && fk.errors.amount)}
+                  aria-describedby={fk.touched.amount && fk.errors.amount ? 'donation-amount-error' : undefined}
                   className={fieldClass}
                 />
-                {fk.touched.amount && fk.errors.amount && <p className="mt-1 text-xs text-rose-600">{fk.errors.amount}</p>}
+                {fk.touched.amount && fk.errors.amount && (
+                  <p id="donation-amount-error" role="alert" className="mt-1 text-xs text-rose-600">
+                    {fk.errors.amount}
+                  </p>
+                )}
               </div>
               <select name="method" value={fk.values.method} onChange={fk.handleChange} className={fieldClass}>
                 <option value="BANK">Bank</option>

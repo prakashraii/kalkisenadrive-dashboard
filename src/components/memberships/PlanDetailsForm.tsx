@@ -1,6 +1,7 @@
 import { Formik } from 'formik'
 import * as Yup from 'yup'
 import { api } from '../../lib/api'
+import { MAX_PRICE_RUPEES, PRICE_TOO_LARGE_MESSAGE, rupeesFitIntCents } from '../../lib/validation'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
 
 const fieldClass =
@@ -9,7 +10,11 @@ const fieldClass =
 const schema = Yup.object({
   name: Yup.string().required('Required'),
   code: Yup.string().required('Required'),
-  price: Yup.number().min(0).required('Required'),
+  price: Yup.number()
+    .typeError('Enter a valid price')
+    .min(0, 'Must be 0 or more')
+    .test('fits-int-cents', PRICE_TOO_LARGE_MESSAGE, (value) => value == null || rupeesFitIntCents(value))
+    .required('Required'),
   durationMonths: Yup.number().min(1).required('Required'),
 })
 
@@ -53,15 +58,24 @@ export function PlanDetailsForm({ onClose }: { onClose: () => void }) {
               </div>
               <div>
                 <input
+                  id="plan-price"
                   type="number"
                   name="price"
                   min={0}
+                  max={MAX_PRICE_RUPEES}
+                  step="0.01"
                   value={fk.values.price}
                   onChange={fk.handleChange}
                   placeholder="Price"
+                  aria-invalid={Boolean(fk.touched.price && fk.errors.price)}
+                  aria-describedby={fk.touched.price && fk.errors.price ? 'plan-price-error' : undefined}
                   className={fieldClass}
                 />
-                {fk.touched.price && fk.errors.price && <p className="mt-1 text-xs text-rose-600">{fk.errors.price}</p>}
+                {fk.touched.price && fk.errors.price && (
+                  <p id="plan-price-error" role="alert" className="mt-1 text-xs text-rose-600">
+                    {fk.errors.price}
+                  </p>
+                )}
               </div>
               <div>
                 <input
