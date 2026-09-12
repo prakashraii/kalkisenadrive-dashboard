@@ -1,10 +1,11 @@
 import { useQuery } from '@tanstack/react-query'
 import { Formik } from 'formik'
 import { ChevronDown, Landmark } from 'lucide-react'
-import type { ChangeEventHandler, ReactNode } from 'react'
+import type { ChangeEventHandler, FocusEventHandler, ReactNode } from 'react'
 import * as Yup from 'yup'
 import { api } from '../../lib/api'
 import { cn } from '../../lib/cn'
+import { ACCOUNT_NUMBER_MESSAGE, accountNumberError } from '../../lib/validation'
 import { useAdminMutation } from '../../viewmodels/useAdminCrud'
 import { ImageUpload } from '../ui/ImageUpload'
 
@@ -56,27 +57,65 @@ export type BankAccount = {
   isDefault: boolean
 }
 
+function FieldError({ id, error }: { id: string; error?: string }) {
+  if (!error) return null
+  return (
+    <p id={id} className="mt-1 text-xs text-rose-600" role="alert">
+      {error}
+    </p>
+  )
+}
+
+const schema = Yup.object({
+  accountName: Yup.string().trim().required('Required'),
+  bankName: Yup.string().trim().required('Required'),
+  branch: Yup.string().trim().required('Required'),
+  accountNumberMasked: Yup.string()
+    .required('Required')
+    .test('account-number', ACCOUNT_NUMBER_MESSAGE, function accountNumber(value) {
+      const message = accountNumberError(value ?? '')
+      if (!message || message === 'Required') return true
+      return this.createError({ message })
+    }),
+  isDefault: Yup.string().required(),
+  notes: Yup.string(),
+  qrUrl: Yup.string(),
+})
+
 function FilledSelect({
   name,
   value,
   onChange,
+  onBlur,
   disabled,
+  invalid,
+  describedBy,
+  required,
   children,
 }: {
   name: string
   value: string
   onChange?: ChangeEventHandler<HTMLSelectElement>
+  onBlur?: FocusEventHandler<HTMLSelectElement>
   disabled?: boolean
+  invalid?: boolean
+  describedBy?: string
+  required?: boolean
   children: ReactNode
 }) {
   return (
     <div className="relative">
       <select
+        id={name}
         name={name}
         value={value}
         onChange={onChange}
+        onBlur={onBlur}
         disabled={disabled}
-        className={cn(fieldClass, 'appearance-none pr-10 disabled:opacity-80')}
+        aria-invalid={invalid || undefined}
+        aria-required={required || undefined}
+        aria-describedby={describedBy}
+        className={cn(fieldClass, 'appearance-none pr-10 disabled:opacity-80', invalid && 'ring-1 ring-rose-500')}
       >
         {children}
       </select>
@@ -84,18 +123,6 @@ function FilledSelect({
     </div>
   )
 }
-
-const schema = Yup.object({
-  accountName: Yup.string().required('Required'),
-  bankName: Yup.string().required('Required'),
-  branch: Yup.string().required('Required'),
-  accountNumberMasked: Yup.string()
-    .required('Required')
-    .matches(/^[0-9]{10,16}$/, 'Enter a 10–16 digit account number'),
-  isDefault: Yup.string().required(),
-  notes: Yup.string(),
-  qrUrl: Yup.string(),
-})
 
 export function PaymentSettingForm({
   bankId,
@@ -114,7 +141,7 @@ export function PaymentSettingForm({
   })
 
   const initialValues = {
-    accountName: bank?.accountName ?? 'Kalki Sena Drive',
+    accountName: bank?.accountName ?? '',
     bankName: bank?.bankName ?? '',
     branch: bank?.branch ?? '',
     accountNumberMasked: bank?.accountNumberMasked ?? '',
@@ -133,10 +160,11 @@ export function PaymentSettingForm({
         initialValues={initialValues}
         validationSchema={schema}
         onSubmit={async (values) => {
+          if (!values.branch.trim()) return
           const payload = {
             accountName: values.accountName.trim(),
-            bankName: values.bankName,
-            branch: values.branch,
+            bankName: values.bankName.trim(),
+            branch: values.branch.trim(),
             accountNumberMasked: values.accountNumberMasked.trim(),
             isDefault: values.isDefault === 'yes',
             notes: values.notes.trim() || undefined,
@@ -160,8 +188,11 @@ export function PaymentSettingForm({
           }
         }}
       >
-        {(fk) => (
-          <form onSubmit={fk.handleSubmit} className="max-w-6xl">
+        {(fk) => {
+          const showError = (field: keyof typeof fk.values) =>
+            Boolean((fk.touched[field] || fk.submitCount > 0) && fk.errors[field])
+          return (
+          <form noValidate onSubmit={fk.handleSubmit} className="max-w-6xl">
             <div className="mb-6">
               <span className="inline-flex h-10 items-center gap-2 rounded-md bg-[#020B17] px-4 text-sm text-white">
                 <Landmark className="size-4" />
@@ -173,20 +204,31 @@ export function PaymentSettingForm({
               <div className="flex flex-col gap-6">
                 <div>
                   <input
+                    id="accountName"
                     name="accountName"
                     value={fk.values.accountName}
                     onChange={fk.handleChange}
+                    onBlur={fk.handleBlur}
                     placeholder="Account Name"
-                    className={fieldClass}
+                    className={cn(fieldClass, showError('accountName') && 'ring-1 ring-rose-500')}
+                    aria-required="true"
+                    aria-invalid={showError('accountName') || undefined}
+                    aria-describedby={showError('accountName') ? 'accountName-error' : undefined}
                   />
-                  {fk.touched.accountName && fk.errors.accountName && (
-                    <p className="mt-1 text-xs text-rose-600">{fk.errors.accountName}</p>
-                  )}
+                  <FieldError id="accountName-error" error={showError('accountName') ? fk.errors.accountName : undefined} />
                 </div>
 
                 <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
                   <div>
-                    <FilledSelect name="bankName" value={fk.values.bankName} onChange={fk.handleChange}>
+                    <FilledSelect
+                      name="bankName"
+                      required
+                      value={fk.values.bankName}
+                      onChange={fk.handleChange}
+                      onBlur={fk.handleBlur}
+                      invalid={showError('bankName')}
+                      describedBy={showError('bankName') ? 'bankName-error' : undefined}
+                    >
                       <option value="">Bank Name</option>
                       {bankOptions.map((name) => (
                         <option key={name} value={name}>
@@ -194,12 +236,18 @@ export function PaymentSettingForm({
                         </option>
                       ))}
                     </FilledSelect>
-                    {fk.touched.bankName && fk.errors.bankName && (
-                      <p className="mt-1 text-xs text-rose-600">{fk.errors.bankName}</p>
-                    )}
+                    <FieldError id="bankName-error" error={showError('bankName') ? fk.errors.bankName : undefined} />
                   </div>
                   <div>
-                    <FilledSelect name="branch" value={fk.values.branch} onChange={fk.handleChange}>
+                    <FilledSelect
+                      name="branch"
+                      required
+                      value={fk.values.branch}
+                      onChange={fk.handleChange}
+                      onBlur={fk.handleBlur}
+                      invalid={showError('branch')}
+                      describedBy={showError('branch') ? 'branch-error' : undefined}
+                    >
                       <option value="">Branch</option>
                       {branchOptions.map((name) => (
                         <option key={name} value={name}>
@@ -207,30 +255,30 @@ export function PaymentSettingForm({
                         </option>
                       ))}
                     </FilledSelect>
-                    {fk.touched.branch && fk.errors.branch && (
-                      <p className="mt-1 text-xs text-rose-600">{fk.errors.branch}</p>
-                    )}
+                    <FieldError id="branch-error" error={showError('branch') ? fk.errors.branch : undefined} />
                   </div>
                 </div>
 
                 <div>
                   <input
+                    id="account-number"
                     name="accountNumberMasked"
                     value={fk.values.accountNumberMasked}
-                    onChange={(e) => {
-                      const digits = e.target.value.replace(/\D/g, '').slice(0, 16)
-                      void fk.setFieldValue('accountNumberMasked', digits)
-                      void fk.setFieldTouched('accountNumberMasked', true, false)
-                    }}
+                    onChange={fk.handleChange}
+                    onBlur={fk.handleBlur}
                     inputMode="numeric"
                     maxLength={16}
                     placeholder="Account Number"
-                    className={fieldClass}
+                    className={cn(fieldClass, showError('accountNumberMasked') && 'ring-1 ring-rose-500')}
                     autoComplete="off"
+                    aria-required="true"
+                    aria-invalid={showError('accountNumberMasked') || undefined}
+                    aria-describedby={showError('accountNumberMasked') ? 'account-number-error' : undefined}
                   />
-                  {fk.touched.accountNumberMasked && fk.errors.accountNumberMasked && (
-                    <p className="mt-1 text-xs text-rose-600">{fk.errors.accountNumberMasked}</p>
-                  )}
+                  <FieldError
+                    id="account-number-error"
+                    error={showError('accountNumberMasked') ? fk.errors.accountNumberMasked : undefined}
+                  />
                 </div>
 
                 <FilledSelect name="isDefault" value={fk.values.isDefault} onChange={fk.handleChange}>
@@ -269,11 +317,12 @@ export function PaymentSettingForm({
                 disabled={fk.isSubmitting}
                 className="h-11 rounded-md bg-[#001E5E] px-6 text-sm font-medium text-white disabled:opacity-60"
               >
-                {fk.isSubmitting ? 'Saving…' : 'Upload'}
+                {fk.isSubmitting ? 'Saving…' : 'Save'}
               </button>
             </div>
           </form>
-        )}
+          )
+        }}
       </Formik>
     </div>
   )

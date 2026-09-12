@@ -26,6 +26,10 @@ function FilterSelect({
 export function TableToolbar({
   search,
   onSearch,
+  filter,
+  onFilter,
+  filterOptions,
+  filterLabel = 'Filter',
   country,
   onCountry,
   from,
@@ -34,6 +38,10 @@ export function TableToolbar({
 }: {
   search: string
   onSearch: (v: string) => void
+  filter?: string
+  onFilter?: (v: string) => void
+  filterOptions?: { value: string; label: string }[]
+  filterLabel?: string
   country?: string
   onCountry?: (v: string) => void
   from?: string
@@ -64,18 +72,27 @@ export function TableToolbar({
         ) : null}
       </label>
       <div className="flex flex-wrap items-center gap-4">
-        <button
-          type="button"
-          className="flex h-11 min-w-[183px] items-center justify-between rounded-md border border-black/12 bg-white px-4 text-base text-black"
-        >
-          <span className="inline-flex items-center gap-2.5">
-            <Filter className="size-3.5" />
-            Filter
-          </span>
-          <ChevronDown className="size-3" />
-        </button>
+        {onFilter && filterOptions ? (
+          <label className="relative flex h-11 min-w-[183px] items-center gap-2.5 rounded-md border border-black/12 bg-white px-4">
+            <Filter className="size-3.5 shrink-0 text-black" aria-hidden="true" />
+            <select
+              value={filter ?? ''}
+              onChange={(e) => onFilter(e.target.value)}
+              aria-label={filterLabel}
+              className="h-full w-full appearance-none bg-transparent pr-6 text-base text-black outline-none"
+            >
+              <option value="">{filterLabel}</option>
+              {filterOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <ChevronDown className="pointer-events-none absolute right-4 size-3 text-black" />
+          </label>
+        ) : null}
         {onCountry && (
-          <FilterSelect value={country} onChange={(e) => onCountry(e.target.value)}>
+          <FilterSelect value={country} aria-label="Country" onChange={(e) => onCountry(e.target.value)}>
             {COUNTRIES.map((c) => (
               <option key={c.value} value={c.value}>
                 {c.label}

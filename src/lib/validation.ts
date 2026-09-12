@@ -21,3 +21,16 @@ export const STOCK_TOO_LARGE_MESSAGE = 'Stock is too large'
 export function rupeesFitIntCents(rupees: number) {
   return Number.isFinite(rupees) && Math.round(rupees * 100) <= PG_INT_MAX
 }
+
+/** Nepal bank account numbers are typically 10–16 digits. */
+export const ACCOUNT_NUMBER_REGEX = /^\d{10,16}$/
+export const ACCOUNT_NUMBER_DIGITS_MESSAGE = 'Account number must contain only digits'
+export const ACCOUNT_NUMBER_MESSAGE = 'Enter a 10–16 digit account number'
+
+export function accountNumberError(value: string) {
+  const accountNumber = value.trim()
+  if (!accountNumber) return 'Required'
+  if (!/^\d+$/.test(accountNumber)) return ACCOUNT_NUMBER_DIGITS_MESSAGE
+  if (!ACCOUNT_NUMBER_REGEX.test(accountNumber)) return ACCOUNT_NUMBER_MESSAGE
+  return undefined
+}

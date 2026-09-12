@@ -11,7 +11,6 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
-  Search,
   Users,
   Video,
   BadgeCheck,
@@ -21,7 +20,7 @@ import { api } from '../lib/api'
 import { cn } from '../lib/cn'
 import { toast } from 'sonner'
 import { useAuth } from '../store/auth'
-import { usePageSearch } from '../store/page-search'
+import { GlobalSearch } from '../components/dashboard/GlobalSearch'
 
 const nav = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -61,14 +60,8 @@ export function DashboardLayout() {
   const location = useLocation()
   const navigate = useNavigate()
   const { admin, setAdmin } = useAuth()
-  const headerSearch = usePageSearch((s) => s.query)
-  const setHeaderSearch = usePageSearch((s) => s.setQuery)
   const [collapsed, setCollapsed] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
-
-  useEffect(() => {
-    setHeaderSearch('')
-  }, [location.pathname, setHeaderSearch])
 
   useEffect(() => {
     api
@@ -280,19 +273,7 @@ export function DashboardLayout() {
             <h1 className="text-2xl font-normal text-white">{title}</h1>
             <p className="text-xs text-white/80">{crumb}</p>
           </div>
-          <div className="mx-auto hidden w-full max-w-xl flex-1 md:block">
-            <label className="flex h-11 items-center gap-2.5 rounded-md border border-white/30 px-4 text-xs">
-              <Search className="size-5 shrink-0 text-white/60" aria-hidden="true" />
-              <input
-                type="search"
-                value={headerSearch}
-                onChange={(e) => setHeaderSearch(e.target.value)}
-                placeholder="Type to search..."
-                aria-label="Search"
-                className="w-full bg-transparent text-white outline-none placeholder:text-white/60 [&::-webkit-search-cancel-button]:hidden"
-              />
-            </label>
-          </div>
+          <GlobalSearch />
           <div className="ml-auto flex items-center gap-6">
             <button className="relative flex size-[58px] items-center justify-center rounded-full bg-white/20" onClick={() => navigate('/notifications')}>
               <Bell className="size-8 text-white" />

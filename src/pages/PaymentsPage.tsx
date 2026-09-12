@@ -139,13 +139,27 @@ export function PaymentsPage() {
         <TableToolbar
           search={list.search}
           onSearch={list.setSearch}
+          filter={list.status}
+          onFilter={list.setStatus}
+          filterLabel="Status"
+          filterOptions={[
+            { value: 'PENDING', label: 'Pending' },
+            { value: 'APPROVED', label: 'Approved' },
+            { value: 'REJECTED', label: 'Rejected' },
+          ]}
           country={list.country}
           onCountry={list.setCountry}
           from={list.from}
           onFrom={list.setFrom}
         />
         <TableFrame>
-          <PaymentTable rows={list.data?.data ?? []} onView={(row) => setParams({ view: row.id, tab })} />
+          <PaymentTable
+            rows={list.data?.data ?? []}
+            onView={(row) => setParams({ view: row.id, tab })}
+            loading={list.isFetching}
+            query={list.search}
+            onClearSearch={() => list.setSearch('')}
+          />
           <Pagination
             page={list.data?.meta.page ?? 1}
             pageCount={list.data?.meta.pageCount ?? 1}

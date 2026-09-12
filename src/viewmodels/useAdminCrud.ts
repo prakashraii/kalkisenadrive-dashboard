@@ -14,6 +14,7 @@ export function useAdminList<T>(key: string, path: string, extra?: Record<string
   const [debouncedSearch, setDebouncedSearch] = useState(headerQuery.trim())
   const [country, setCountry] = useState('')
   const [from, setFrom] = useState('')
+  const [status, setStatus] = useState('')
 
   useEffect(() => {
     const handle = window.setTimeout(() => setDebouncedSearch(search.trim()), SEARCH_DEBOUNCE_MS)
@@ -39,6 +40,10 @@ export function useAdminList<T>(key: string, path: string, extra?: Record<string
     setPage(1)
     setFrom(value)
   }
+  function setStatusAndReset(value: string) {
+    setPage(1)
+    setStatus(value)
+  }
 
   const params = useMemo(
     () => ({
@@ -47,9 +52,10 @@ export function useAdminList<T>(key: string, path: string, extra?: Record<string
       search: debouncedSearch || undefined,
       country: country || undefined,
       from: from || undefined,
+      status: status || undefined,
       ...extra,
     }),
-    [page, debouncedSearch, country, from, extra],
+    [page, debouncedSearch, country, from, status, extra],
   )
   const query = useQuery({
     queryKey: [key, params],
@@ -57,7 +63,12 @@ export function useAdminList<T>(key: string, path: string, extra?: Record<string
     placeholderData: (previousData, previousQuery) => {
       if (previousQuery?.queryKey[0] !== key) return undefined
       const prev = previousQuery.queryKey[1] as typeof params | undefined
-      if (prev?.search !== params.search || prev?.country !== params.country || prev?.from !== params.from) {
+      if (
+        prev?.search !== params.search ||
+        prev?.country !== params.country ||
+        prev?.from !== params.from ||
+        prev?.status !== params.status
+      ) {
         return undefined
       }
       return previousData
@@ -73,6 +84,8 @@ export function useAdminList<T>(key: string, path: string, extra?: Record<string
     setCountry: setCountryAndReset,
     from,
     setFrom: setFromAndReset,
+    status,
+    setStatus: setStatusAndReset,
   }
 }
 
